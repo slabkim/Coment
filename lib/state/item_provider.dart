@@ -29,6 +29,7 @@ class ItemProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _all = await repo.getAll();
+      _all.shuffle();
       _applyFilter();
     } finally {
       _loading = false;

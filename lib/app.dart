@@ -4,7 +4,7 @@ import 'core/constants.dart';
 import 'data/repositories/nandogami_repository.dart';
 import 'data/services/api_service.dart';
 import 'state/item_provider.dart';
-import 'ui/screens/home_screen.dart';
+// import 'ui/screens/home_screen.dart';
 import 'ui/screens/main_screen.dart';
 
 class NandogamiApp extends StatelessWidget {
