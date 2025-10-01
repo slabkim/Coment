@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 class AppConst {
   static const appName = 'Nandogami';
+  // Ganti baseUrl sesuai API-mu nanti; untuk awal pakai dummy JSON.
   static const baseUrl = 'https://example.com/api';
-  static const giphyApiKey = 'p6voZ9nHm0dUKU1umv6F9TlC263MDUQy';
 }
 
 class AppColors {

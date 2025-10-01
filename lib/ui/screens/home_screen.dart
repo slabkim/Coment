@@ -1,11 +1,9 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants.dart'; // AppConst, AppColors
 import '../../data/models/nandogami_item.dart';
 import '../../state/item_provider.dart';
-import 'chat_list_screen.dart';
 import 'detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -49,20 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             tooltip: 'DM',
             icon: const Icon(Icons.send, color: AppColors.white, size: 22),
-            onPressed: () {
-              final user = FirebaseAuth.instance.currentUser;
-              if (user == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please sign in to use Direct Messages'),
-                  ),
-                );
-                return;
-              }
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const ChatListScreen()));
-            },
+            onPressed: () {},
           ),
           const SizedBox(width: 4),
           Padding(
@@ -352,6 +337,12 @@ class _PosterCard extends StatelessWidget {
 /// ===== Matikan efek glow/overscroll =====
 class _NoGlowScrollBehavior extends ScrollBehavior {
   const _NoGlowScrollBehavior();
+  @override
+  Widget buildViewportChrome(
+    BuildContext context,
+    Widget child,
+    AxisDirection axisDirection,
+  ) => child;
   @override
   Widget buildOverscrollIndicator(
     BuildContext context,

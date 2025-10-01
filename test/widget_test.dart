@@ -8,15 +8,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:nandogami_flutter/core/constants.dart';
-import 'package:nandogami_flutter/ui/screens/splash_screen.dart';
+import 'package:nandogami_flutter/app.dart';
 
 void main() {
-  testWidgets('Splash screen shows brand', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(home: SplashScreen(enableAutoNavigate: false)),
-    );
+  testWidgets('Nandogami app launches smoke test', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
+    await tester.pumpWidget(const NandogamiApp());
 
-    expect(find.text(AppConst.appName), findsOneWidget);
+    // Verify that the app title is displayed.
+    expect(find.text('Nandogami'), findsOneWidget);
+
+    // Verify no errors in rendering.
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
   });
 }
