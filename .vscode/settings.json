@@ -1,4 +1,4 @@
 {
     "java.configuration.updateBuildConfiguration": "interactive",
-    "cmake.sourceDirectory": "C:/Users/SIAK/OneDrive/Documents/Flutter/nandogami_flutter/linux"
+    "cmake.sourceDirectory": "${workspaceFolder}/linux"
 }

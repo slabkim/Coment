@@ -46,7 +46,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '190535714842',
     projectId: 'nandogami-45016',
     authDomain: 'nandogami-45016.firebaseapp.com',
-    databaseURL: 'https://nandogami-45016-default-rtdb.asia-southeast1.firebasedatabase.app',
+    databaseURL:
+        'https://nandogami-45016-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'nandogami-45016.firebasestorage.app',
     measurementId: 'G-PYT9W7H87D',
   );
@@ -56,7 +57,8 @@ class DefaultFirebaseOptions {
     appId: '1:190535714842:android:3ec9b1b47eea08837be9a3',
     messagingSenderId: '190535714842',
     projectId: 'nandogami-45016',
-    databaseURL: 'https://nandogami-45016-default-rtdb.asia-southeast1.firebasedatabase.app',
+    databaseURL:
+        'https://nandogami-45016-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'nandogami-45016.firebasestorage.app',
   );
 
@@ -65,7 +67,8 @@ class DefaultFirebaseOptions {
     appId: '1:190535714842:ios:984b6dbf8236a9bb7be9a3',
     messagingSenderId: '190535714842',
     projectId: 'nandogami-45016',
-    databaseURL: 'https://nandogami-45016-default-rtdb.asia-southeast1.firebasedatabase.app',
+    databaseURL:
+        'https://nandogami-45016-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'nandogami-45016.firebasestorage.app',
     iosBundleId: 'com.example.nandogamiFlutter',
   );
@@ -75,7 +78,8 @@ class DefaultFirebaseOptions {
     appId: '1:190535714842:ios:984b6dbf8236a9bb7be9a3',
     messagingSenderId: '190535714842',
     projectId: 'nandogami-45016',
-    databaseURL: 'https://nandogami-45016-default-rtdb.asia-southeast1.firebasedatabase.app',
+    databaseURL:
+        'https://nandogami-45016-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'nandogami-45016.firebasestorage.app',
     iosBundleId: 'com.example.nandogamiFlutter',
   );
@@ -86,7 +90,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '190535714842',
     projectId: 'nandogami-45016',
     authDomain: 'nandogami-45016.firebaseapp.com',
-    databaseURL: 'https://nandogami-45016-default-rtdb.asia-southeast1.firebasedatabase.app',
+    databaseURL:
+        'https://nandogami-45016-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'nandogami-45016.firebasestorage.app',
     measurementId: 'G-VBYJFE73PE',
   );

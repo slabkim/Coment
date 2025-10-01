@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../data/services/user_service.dart';
 import '../../../core/constants.dart';
 
 class LoginRegisterScreen extends StatefulWidget {
@@ -70,7 +71,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
       _error = null;
     });
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailC.text.trim(),
         password: _passwordC.text.trim(),
       );
@@ -78,6 +79,15 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
       await FirebaseAuth.instance.currentUser?.updateDisplayName(
         _usernameC.text.trim(),
       );
+      final user = cred.user;
+      if (user != null) {
+        await UserService().ensureUserDoc(
+          uid: user.uid,
+          email: user.email ?? _emailC.text.trim(),
+          displayName: _usernameC.text.trim(),
+          photoUrl: user.photoURL,
+        );
+      }
       if (mounted && Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
@@ -129,15 +139,13 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: const Color(
-                        0xFF3B2A58,
-                      ), // circle_purple_avatar feel
+                      color: const Color(0xFF3B2A58),
                       shape: BoxShape.circle,
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: Center(
                       child: Image.asset(
-                        'assets/images/Coment Logo.png',
+                        'lib/assets/legacy/logogede.png',
                         width: 56,
                         height: 56,
                         fit: BoxFit.contain,

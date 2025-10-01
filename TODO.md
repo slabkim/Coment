@@ -1,0 +1,1 @@
+- [x] Modify ItemProvider.load() to shuffle the fetched items for random order on app start

@@ -1,0 +1,47 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "chats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "participants", "arrayConfig": "CONTAINS"},
+        {"fieldPath": "lastMessageTime", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "chat_messages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "chatId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "titleId", "order": "ASCENDING"},
+        {"fieldPath": "timestamp", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "favorites",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "userId", "order": "ASCENDING"},
+        {"fieldPath": "titleId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "reading_status",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "userId", "order": "ASCENDING"},
+        {"fieldPath": "titleId", "order": "ASCENDING"}
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
+
+
