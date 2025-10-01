@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -178,7 +180,7 @@ class _AboutTab extends StatelessWidget {
               _Stars(rating: (item.rating ?? 0).toDouble()),
               const SizedBox(width: 8),
               Text(
-                '${(item.rating ?? 0).toStringAsFixed(1)}',
+                (item.rating ?? 0).toStringAsFixed(1),
                 style: const TextStyle(color: AppColors.white),
               ),
               if ((item.ratingCount ?? 0) > 0) ...[
@@ -217,7 +219,7 @@ class _AboutTab extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            item.synopsis ?? item.description ?? 'No synopsis available',
+            item.synopsis ?? 'No synopsis available.',
             style: const TextStyle(
               color: AppColors.whiteSecondary,
               height: 1.35,

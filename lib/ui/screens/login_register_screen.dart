@@ -137,7 +137,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                     clipBehavior: Clip.antiAlias,
                     child: Center(
                       child: Image.asset(
-                        'assets/logogede.png', // ganti sesuai asetmu
+                        'assets/images/Coment Logo.png',
                         width: 56,
                         height: 56,
                         fit: BoxFit.contain,
@@ -346,8 +346,9 @@ class _LoginFormState extends State<_LoginForm> {
             keyboardType: TextInputType.emailAddress,
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Email wajib diisi';
-              if (!RegExp(r'^\S+@\S+\.\S+$').hasMatch(v.trim()))
+              if (!RegExp(r'^\S+@\S+\.\S+$').hasMatch(v.trim())) {
                 return 'Email tidak valid';
+              }
               return null;
             },
           ),
@@ -446,8 +447,9 @@ class _SignupFormState extends State<_SignupForm> {
             keyboardType: TextInputType.emailAddress,
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Email wajib diisi';
-              if (!RegExp(r'^\S+@\S+\.\S+$').hasMatch(v.trim()))
+              if (!RegExp(r'^\S+@\S+\.\S+$').hasMatch(v.trim())) {
                 return 'Email tidak valid';
+              }
               return null;
             },
           ),
