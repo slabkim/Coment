@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants.dart';
+import '../../data/models/nandogami_item.dart';
+import '../../data/services/favorite_service.dart';
+import '../../state/item_provider.dart';
+import 'detail_screen.dart';
 
 class RecommendationsScreen extends StatelessWidget {
   const RecommendationsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final favs = FavoriteService();
+    final prov = context.watch<ItemProvider>();
     return Scaffold(
       appBar: AppBar(
         title: const Text('User Recommendations'),
@@ -19,33 +28,82 @@ class RecommendationsScreen extends StatelessWidget {
         ],
       ),
       backgroundColor: AppColors.black,
-      body: ListView.separated(
-        padding: const EdgeInsets.all(12),
-        itemCount: 10,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, i) => Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E232B),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person)),
-            title: Text(
-              'Recommended by User $i',
-              style: const TextStyle(color: AppColors.white),
+      body: uid == null
+          ? const Center(
+              child: Text('Login required', style: TextStyle(color: AppColors.white)),
+            )
+          : StreamBuilder<List<String>>( 
+              stream: favs.watchFavorites(uid),
+              builder: (context, snap) {
+                final myFavIds = snap.data ?? const <String>[];
+                // naive recs: pick items that share categories with my favorites
+                final myFavItems = myFavIds
+                    .map((id) => prov.findById(id))
+                    .whereType<NandogamiItem>()
+                    .toList();
+                final myCats = <String>{
+                  for (final it in myFavItems)
+                    ...((it.categories ?? const <String>[]))
+                };
+                final candidates = prov.items.where((e) {
+                  if (myFavIds.contains(e.id)) return false; // exclude already fav
+                  final cats = e.categories ?? const <String>[];
+                  return cats.any((c) => myCats.contains(c));
+                }).toList();
+                if (candidates.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No recommendations yet',
+                      style: TextStyle(color: AppColors.whiteSecondary),
+                    ),
+                  );
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: candidates.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, i) {
+                    final it = candidates[i];
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E232B),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: ListTile(
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            it.imageUrl,
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        title: Text(
+                          it.title,
+                          style: const TextStyle(color: AppColors.white),
+                        ),
+                        subtitle: Text(
+                          (it.categories ?? const []).join(', '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: AppColors.whiteSecondary),
+                        ),
+                        trailing: const Icon(
+                          Icons.chevron_right,
+                          color: AppColors.whiteSecondary,
+                        ),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => DetailScreen(item: it)),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                );
+              },
             ),
-            subtitle: const Text(
-              'Because you both liked "Sample"',
-              style: TextStyle(color: AppColors.whiteSecondary),
-            ),
-            trailing: const Icon(
-              Icons.chevron_right,
-              color: AppColors.whiteSecondary,
-            ),
-            onTap: () {},
-          ),
-        ),
-      ),
     );
   }
 

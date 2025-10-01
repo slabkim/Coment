@@ -133,6 +133,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'username': newName,
         'bio': newBio,
         if (photoUrl != null) 'photoUrl': photoUrl,
+        if (newName.isNotEmpty) 'usernameLower': newName.toLowerCase(),
         'updatedAt': DateTime.now().millisecondsSinceEpoch,
       }, SetOptions(merge: true));
       if (photoUrl != null) {
@@ -146,6 +147,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'handle': newName.isNotEmpty
             ? newName.toLowerCase().replaceAll(' ', '')
             : user.email?.split('@').first,
+        'handleLower': (newName.isNotEmpty
+                ? newName.toLowerCase().replaceAll(' ', '')
+                : user.email?.split('@').first)
+            ?.toLowerCase(),
       }, SetOptions(merge: true));
       if (!mounted) return;
       Navigator.pop(context);

@@ -38,4 +38,13 @@ class FavoriteService {
       });
     }
   }
+
+  /// Watch all favorite title IDs for a user.
+  Stream<List<String>> watchFavorites(String userId) {
+    return _db
+        .collection('favorites')
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .map((s) => s.docs.map((d) => (d.data()['titleId'] as String)).toList());
+  }
 }

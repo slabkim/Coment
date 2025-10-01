@@ -39,6 +39,20 @@
         {"fieldPath": "userId", "order": "ASCENDING"},
         {"fieldPath": "titleId", "order": "ASCENDING"}
       ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "handleLower", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "usernameLower", "order": "ASCENDING"}
+      ]
     }
   ],
   "fieldOverrides": []

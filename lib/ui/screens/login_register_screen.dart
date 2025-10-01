@@ -145,7 +145,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                     clipBehavior: Clip.antiAlias,
                     child: Center(
                       child: Image.asset(
-                        'lib/assets/legacy/logogede.png',
+                        'assets/images/comentlogo.png',
                         width: 56,
                         height: 56,
                         fit: BoxFit.contain,

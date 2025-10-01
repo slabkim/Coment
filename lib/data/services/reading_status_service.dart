@@ -50,4 +50,17 @@ class ReadingStatusService {
       });
     }
   }
+
+  /// Watch all title IDs for a given user and status.
+  Stream<List<String>> watchTitlesByStatus({
+    required String userId,
+    required String status,
+  }) {
+    return _db
+        .collection('reading_status')
+        .where('userId', isEqualTo: userId)
+        .where(fieldStatus, isEqualTo: status)
+        .snapshots()
+        .map((s) => s.docs.map((d) => (d.data()['titleId'] as String)).toList());
+  }
 }

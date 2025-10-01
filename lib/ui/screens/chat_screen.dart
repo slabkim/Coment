@@ -33,6 +33,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _history = ChatHistoryService();
   final _userService = UserService();
   String? _selfName;
+  int _lastPeerMsgMs = 0;
 
   @override
   void dispose() {
@@ -108,54 +109,99 @@ class _ChatScreenState extends State<ChatScreen> {
                         return const Center(child: CircularProgressIndicator());
                       }
                       final cid = snap.data!;
-                      return StreamBuilder<List<ChatMessage>>(
-                        stream: _chat.watchMessages(cid),
-                        builder: (context, s2) {
-                          final msgs = s2.data ?? const [];
-                          // mark read when list updates
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            _history.markReadNow(cid, uid);
-                          });
-                          return ListView.builder(
-                            controller: _scrollC,
-                            reverse: true,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 8,
-                              horizontal: 12,
-                            ),
-                            itemCount: msgs.length,
-                            itemBuilder: (context, i) {
-                              final m = msgs[i];
-                              final isMe = m.senderId == uid;
-                              final content =
-                                  m.imageUrl != null && m.imageUrl!.isNotEmpty
-                                  ? Image.network(m.imageUrl!, width: 180)
-                                  : Text(
-                                      m.text ?? '',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                      ),
-                                    );
-                              return Align(
-                                alignment: isMe
-                                    ? Alignment.centerRight
-                                    : Alignment.centerLeft,
-                                child: Container(
-                                  margin: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                    horizontal: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isMe
-                                        ? const Color(0xFF3B2A58)
-                                        : const Color(0xFF1E232B),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: content,
+                      return StreamBuilder<int?>(
+                        stream: _history.watchLastRead(cid, widget.peerUserId),
+                        builder: (context, readSnap) {
+                          final peerLastRead = readSnap.data ?? 0;
+                          return StreamBuilder<List<ChatMessage>>(
+                            stream: _chat.watchMessages(cid),
+                            builder: (context, s2) {
+                              final msgs = s2.data ?? const [];
+                              // mark read when list updates
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                _history.markReadNow(cid, uid);
+                              });
+                              // in-app popup when new peer message arrives
+                              if (msgs.isNotEmpty) {
+                                final last = msgs.first; // reverse list view
+                                if (last.senderId == widget.peerUserId) {
+                                  final ts = last.createdAt.millisecondsSinceEpoch;
+                                  if (ts > _lastPeerMsgMs) {
+                                    _lastPeerMsgMs = ts;
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          behavior: SnackBarBehavior.floating,
+                                          content: Text(last.text?.trim().isNotEmpty == true
+                                              ? last.text!
+                                              : 'New image'),
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                }
+                              }
+                              return ListView.builder(
+                                controller: _scrollC,
+                                reverse: true,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 12,
                                 ),
+                                itemCount: msgs.length,
+                                itemBuilder: (context, i) {
+                                  final m = msgs[i];
+                                  final isMe = m.senderId == uid;
+                                  final content =
+                                      m.imageUrl != null && m.imageUrl!.isNotEmpty
+                                      ? Image.network(m.imageUrl!, width: 180)
+                                      : Text(
+                                          m.text ?? '',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                          ),
+                                        );
+                                  final isRead = isMe && (m.createdAt.millisecondsSinceEpoch <= peerLastRead);
+                                  return Align(
+                                    alignment: isMe
+                                        ? Alignment.centerRight
+                                        : Alignment.centerLeft,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        if (!isMe) const SizedBox(width: 0) else const SizedBox(width: 0),
+                                        Container(
+                                          margin: const EdgeInsets.symmetric(
+                                            vertical: 4,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                            horizontal: 12,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isMe
+                                                ? const Color(0xFF3B2A58)
+                                                : const Color(0xFF1E232B),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: content,
+                                        ),
+                                        if (isMe) ...[
+                                          const SizedBox(width: 6),
+                                          Icon(
+                                            isRead ? Icons.done_all : Icons.check,
+                                            size: 16,
+                                            color: isRead
+                                                ? Colors.lightBlueAccent
+                                                : Colors.white54,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  );
+                                },
                               );
                             },
                           );
