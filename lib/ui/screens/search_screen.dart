@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants.dart';
+import '../../core/auth_helper.dart';
 import '../../state/item_provider.dart';
 import '../../data/services/search_service.dart';
 import '../../data/services/user_service.dart';
 import '../../data/models/user_profile.dart';
 import '../widgets/common.dart';
 import 'user_public_profile_screen.dart';
-import '../../data/models/nandogami_item.dart';
 import 'detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -44,33 +44,77 @@ class _SearchScreenState extends State<SearchScreen> {
     final prov = context.watch<ItemProvider>();
     return Scaffold(
       appBar: AppBar(
-        title: TextField(
-          controller: _c,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Search titles, tags...',
-            hintStyle: TextStyle(color: AppColors.whiteSecondary),
-            border: InputBorder.none,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        elevation: 0,
+        titleSpacing: 0,
+        leading: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outline,
+              width: 1,
+            ),
           ),
-          onChanged: (v) => prov.search(v),
-          onSubmitted: (v) async {
-            await _svc.pushRecent(v);
-            _loadRecent();
-          },
+          child: IconButton(
+            icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
+            onPressed: () => Navigator.pop(context),
+          ),
         ),
-        backgroundColor: AppColors.black,
-        foregroundColor: AppColors.white,
-        actions: [
-          IconButton(
-            onPressed: () {
-              _c.clear();
-              prov.search('');
-            },
-            icon: const Icon(Icons.clear),
+        title: Container(
+          margin: const EdgeInsets.only(right: 16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outline,
+              width: 1,
+            ),
           ),
-        ],
+          child: TextField(
+            controller: _c,
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+            decoration: InputDecoration(
+              hintText: 'Search manga, authors, genres...',
+              hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              prefixIcon: Icon(
+                Icons.search,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                size: 20,
+              ),
+              suffixIcon: _c.text.isNotEmpty
+                  ? IconButton(
+                      icon: Icon(
+                        Icons.clear,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        _c.clear();
+                        prov.search('');
+                        setState(() {});
+                      },
+                    )
+                  : null,
+            ),
+            onChanged: (value) {
+              setState(() {});
+              prov.search(value);
+            },
+            onSubmitted: (v) async {
+              await _svc.pushRecent(v);
+              _loadRecent();
+            },
+          ),
+        ),
       ),
-      backgroundColor: AppColors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: prov.query.isEmpty
           ? _RecentAndSuggestions(
               recent: _recent,
@@ -99,10 +143,10 @@ class _RecentAndSuggestions extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         if (recent.isNotEmpty) ...[
-          const Text(
+          Text(
             'Recent searches',
             style: TextStyle(
-              color: AppColors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -115,8 +159,8 @@ class _RecentAndSuggestions extends StatelessWidget {
                   (e) => ActionChip(
                     label: Text(e),
                     onPressed: () => onTap(e),
-                    backgroundColor: const Color(0xFF2A2E35),
-                    labelStyle: const TextStyle(color: AppColors.white),
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    labelStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                   ),
                 )
                 .toList(),
@@ -164,9 +208,9 @@ class _RecentAndSuggestions extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           'Popular tags',
-          style: TextStyle(color: AppColors.white, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -194,8 +238,8 @@ class _TagChip extends StatelessWidget {
     return ActionChip(
       label: Text(text),
       onPressed: () => context.read<ItemProvider>().search(text),
-      backgroundColor: const Color(0xFF2A2E35),
-      labelStyle: const TextStyle(color: AppColors.white),
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      labelStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface),
     );
   }
 }
@@ -206,10 +250,10 @@ class _SearchResults extends StatelessWidget {
     final prov = context.watch<ItemProvider>();
     final items = prov.items;
     if (items.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No results',
-          style: TextStyle(color: AppColors.whiteSecondary),
+          style: Theme.of(context).textTheme.bodyMedium,
         ),
       );
     }
@@ -231,8 +275,8 @@ class _SearchResults extends StatelessWidget {
           ),
           title: Text(
             it.title,
-            style: const TextStyle(
-              color: AppColors.white,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -240,7 +284,7 @@ class _SearchResults extends StatelessWidget {
             (it.categories ?? const []).join(', '),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: AppColors.whiteSecondary),
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
           onTap: () {
             Navigator.of(context).push(
@@ -266,8 +310,8 @@ class _UserResults extends StatelessWidget {
       builder: (context, snapshot) {
         final users = snapshot.data ?? const [];
         if (users.isEmpty) {
-          return const Center(
-            child: Text('No users found', style: TextStyle(color: AppColors.whiteSecondary)),
+          return Center(
+            child: Text('No users found', style: Theme.of(context).textTheme.bodyMedium),
           );
         }
         return ListView.separated(
@@ -285,16 +329,24 @@ class _UserResults extends StatelessWidget {
                     ? const Icon(Icons.person)
                     : null,
               ),
-              title: Text(u.username ?? u.handle ?? 'User', style: const TextStyle(color: AppColors.white)),
+              title: Text(u.username ?? u.handle ?? 'User', style: Theme.of(context).textTheme.bodyLarge),
               subtitle: Text(
                 (u.handle ?? u.email ?? ''),
-                style: const TextStyle(color: AppColors.whiteSecondary),
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => UserPublicProfileScreen(userId: u.id),
-                ),
-              ),
+              onTap: () async {
+                final success = await AuthHelper.requireAuthWithDialog(
+                  context, 
+                  'view user profile'
+                );
+                if (success) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => UserPublicProfileScreen(userId: u.id),
+                    ),
+                  );
+                }
+              },
             );
           },
         );

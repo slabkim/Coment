@@ -18,10 +18,10 @@ class UserPublicProfileScreen extends StatelessWidget {
     final followService = FollowService();
     final isSelf = currentUid == userId;
     return Scaffold(
-      backgroundColor: AppColors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.black,
-        foregroundColor: AppColors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
         title: const Text('Profile'),
       ),
       body: StreamBuilder<UserProfile?>(
@@ -32,10 +32,10 @@ class UserPublicProfileScreen extends StatelessWidget {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
-            return const Center(
+            return Center(
               child: Text(
                 'User not found',
-                style: TextStyle(color: AppColors.whiteSecondary),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             );
           }
@@ -51,17 +51,15 @@ class UserPublicProfileScreen extends StatelessWidget {
               Center(
                 child: CircleAvatar(
                   radius: 54,
-                  backgroundColor: AppColors.purpleAccent.withValues(
-                    alpha: 0.2,
-                  ),
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                   backgroundImage: (photo != null && photo.isNotEmpty)
                       ? NetworkImage(photo)
                       : null,
                   child: (photo == null || photo.isEmpty)
                       ? Text(
                           _initials(name),
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
                           ),
@@ -73,8 +71,8 @@ class UserPublicProfileScreen extends StatelessWidget {
               Center(
                 child: Text(
                   name,
-                  style: const TextStyle(
-                    color: AppColors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
                   ),
@@ -86,8 +84,8 @@ class UserPublicProfileScreen extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
                       handle.startsWith('@') ? handle : '@$handle',
-                      style: const TextStyle(
-                        color: AppColors.whiteSecondary,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 14,
                       ),
                     ),
@@ -98,7 +96,7 @@ class UserPublicProfileScreen extends StatelessWidget {
                 Text(
                   bio,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppColors.whiteSecondary),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ],
               const SizedBox(height: 24),
@@ -121,15 +119,15 @@ class UserPublicProfileScreen extends StatelessWidget {
                                   ),
                             style: FilledButton.styleFrom(
                               backgroundColor: isFollowing
-                                  ? const Color(0xFF2A2E35)
-                                  : AppColors.purpleAccent,
+                                  ? Theme.of(context).colorScheme.surfaceContainerHighest
+                                  : Theme.of(context).colorScheme.primary,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
                             child: Text(
                               isFollowing ? 'Following' : 'Follow',
                               style: TextStyle(
                                 color: isFollowing
-                                    ? AppColors.whiteSecondary
+                                    ? Theme.of(context).colorScheme.onSurfaceVariant
                                     : Colors.white,
                               ),
                             ),

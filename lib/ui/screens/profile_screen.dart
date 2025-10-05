@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../core/constants.dart';
+import '../../core/auth_helper.dart';
 import '../../data/models/user_profile.dart';
 import '../../data/services/user_service.dart';
 import '../../data/services/follow_service.dart';
@@ -9,7 +11,6 @@ import '../../data/services/reading_status_service.dart';
 import 'edit_profile_screen.dart';
 import 'user_list_screen.dart';
 import 'reading_list_screen.dart';
-import 'chat_list_screen.dart';
 import 'recommendations_screen.dart';
 import 'about_screen.dart';
 import 'package:provider/provider.dart';
@@ -20,42 +21,52 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
     final userService = UserService();
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        backgroundColor: AppColors.black,
-        foregroundColor: AppColors.white,
-        actions: [
-          IconButton(
-            tooltip: 'Edit profile',
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-              );
-            },
-          ),
-          IconButton(
-            tooltip: 'Tema',
-            icon: const Icon(Icons.color_lens_outlined),
-            onPressed: () => _showThemeSheet(context),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      backgroundColor: AppColors.black,
-      body: uid == null
-          ? const Center(
-              child: Text(
-                'Login required',
-                style: TextStyle(color: AppColors.white),
+    
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, authSnapshot) {
+        final user = authSnapshot.data;
+        final uid = user?.uid;
+        
+        // Debug log
+        debugPrint('ProfileScreen - Auth state changed: ${user?.uid}');
+        debugPrint('ProfileScreen - Current user: $user');
+        
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Profile'),
+            backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+            foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
+            actions: uid != null ? [
+              IconButton(
+                tooltip: 'Edit profile',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+                  );
+                },
               ),
-            )
-          : StreamBuilder<UserProfile?>(
-              stream: userService.watchProfile(uid),
-              builder: (context, snapshot) {
+              IconButton(
+                tooltip: 'Tema',
+                icon: const Icon(Icons.color_lens_outlined),
+                onPressed: () => _showThemeSheet(context),
+              ),
+              IconButton(
+                tooltip: 'Logout',
+                icon: const Icon(Icons.logout),
+                onPressed: () => _showLogoutDialog(context),
+              ),
+              const SizedBox(width: 8),
+            ] : null,
+          ),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          body: uid == null
+              ? _LoginRequiredWidget()
+              : StreamBuilder<UserProfile?>(
+                  stream: userService.watchProfile(uid),
+                  builder: (context, snapshot) {
                 final profile = snapshot.data;
                 return ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -72,43 +83,7 @@ class ProfileScreen extends StatelessWidget {
                     const SizedBox(height: 18),
                     const _ProfileStats(),
                     const SizedBox(height: 10),
-                    // DM entry removed (DM tersedia dari Home)
-                    _tile(
-                      context,
-                      icon: Icons.library_books,
-                      title: 'Library',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const ReadingListScreen(),
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const UserListScreen(title: 'Followers'),
-                        ),
-                      ),
-                      child: _tile(
-                        context,
-                        icon: Icons.people,
-                        title: 'Followers',
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const UserListScreen(title: 'Following'),
-                        ),
-                      ),
-                      child: _tile(
-                        context,
-                        icon: Icons.person_add,
-                        title: 'Following',
-                      ),
-                    ),
+                    // Reading List - main access point
                     _tile(
                       context,
                       icon: Icons.menu_book,
@@ -116,16 +91,6 @@ class ProfileScreen extends StatelessWidget {
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => const ReadingListScreen(),
-                        ),
-                      ),
-                    ),
-                    _tile(
-                      context,
-                      icon: Icons.recommend,
-                      title: 'User Recommendations',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const RecommendationsScreen(),
                         ),
                       ),
                     ),
@@ -144,6 +109,8 @@ class ProfileScreen extends StatelessWidget {
                 );
               },
             ),
+        );
+      },
     );
   }
 }
@@ -179,8 +146,7 @@ class _AvatarHeader extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           name,
-          style: const TextStyle(
-            color: AppColors.white,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
             fontSize: 20,
             fontWeight: FontWeight.w700,
           ),
@@ -190,7 +156,9 @@ class _AvatarHeader extends StatelessWidget {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               handle.startsWith('@') ? handle : '@$handle',
-              style: const TextStyle(color: AppColors.whiteSecondary),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
       ],
@@ -224,28 +192,46 @@ class _ProfileStats extends StatelessWidget {
       children: [
         StreamBuilder<List<Map<String, dynamic>>>(
           stream: follow.following(uid),
-          builder: (_, s) => _StatItem(
-            label: 'Following',
-            value: (s.data?.length ?? 0).toString(),
+          builder: (_, s) => GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const UserListScreen(title: 'Following'),
+              ),
+            ),
+            child: _StatItem(
+              label: 'Following',
+              value: (s.data?.length ?? 0).toString(),
+            ),
           ),
         ),
         const SizedBox(width: 22),
         StreamBuilder<List<Map<String, dynamic>>>(
           stream: follow.followers(uid),
-          builder: (_, s) => _StatItem(
-            label: 'Followers',
-            value: (s.data?.length ?? 0).toString(),
+          builder: (_, s) => GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const UserListScreen(title: 'Followers'),
+              ),
+            ),
+            child: _StatItem(
+              label: 'Followers',
+              value: (s.data?.length ?? 0).toString(),
+            ),
           ),
         ),
         const SizedBox(width: 22),
         StreamBuilder<List<String>>(
-          stream: ReadingStatusService().watchTitlesByStatus(
-            userId: uid,
-            status: 'reading',
-          ),
-          builder: (_, s) => _StatItem(
-            label: 'Reads',
-            value: (s.data?.length ?? 0).toString(),
+          stream: ReadingStatusService().watchAllReadingTitles(uid),
+          builder: (_, s) => GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const ReadingListScreen(),
+              ),
+            ),
+            child: _StatItem(
+              label: 'Reads',
+              value: (s.data?.length ?? 0).toString(),
+            ),
           ),
         ),
       ],
@@ -265,8 +251,8 @@ class _StatItem extends StatelessWidget {
       children: [
         Text(
           value,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
@@ -274,7 +260,10 @@ class _StatItem extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           label,
-          style: const TextStyle(color: AppColors.whiteSecondary, fontSize: 12),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 12,
+          ),
         ),
       ],
     );
@@ -290,15 +279,15 @@ Widget _tile(
   return Column(
     children: [
       ListTile(
-        leading: Icon(icon, color: AppColors.white),
-        title: Text(title, style: const TextStyle(color: AppColors.white)),
-        trailing: const Icon(
+        leading: Icon(icon, color: Theme.of(context).colorScheme.onSurface),
+        title: Text(title, style: Theme.of(context).textTheme.bodyLarge),
+        trailing: Icon(
           Icons.chevron_right,
-          color: AppColors.whiteSecondary,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
         onTap: onTap,
       ),
-      const Divider(height: 1, color: Color(0xFF22252B)),
+      Divider(height: 1, color: Theme.of(context).dividerTheme.color),
     ],
   );
 }
@@ -306,12 +295,71 @@ Widget _tile(
 void _showThemeSheet(BuildContext context) {
   showModalBottomSheet(
     context: context,
-    backgroundColor: const Color(0xFF0E0F12),
+    backgroundColor: Theme.of(context).colorScheme.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
     builder: (_) => const _ThemeSheet(),
   );
+}
+
+void _showLogoutDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        backgroundColor: const Color(0xFF0E0F12),
+        title: const Text(
+          'Logout',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Apakah Anda yakin ingin logout?',
+          style: TextStyle(color: AppColors.whiteSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              'Batal',
+              style: TextStyle(color: AppColors.whiteSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _logout(context);
+            },
+            child: const Text(
+              'Logout',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+Future<void> _logout(BuildContext context) async {
+  try {
+    await FirebaseAuth.instance.signOut();
+    await GoogleSignIn().signOut();
+    
+    if (context.mounted) {
+      // Navigate to login screen or show login required message
+      Navigator.of(context).pushReplacementNamed('/login');
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Logout gagal: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 }
 
 class _ThemeSheet extends StatelessWidget {
@@ -329,9 +377,13 @@ class _ThemeSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Tema Aplikasi',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
             ),
             const SizedBox(height: 12),
             _themeOption(context, 'Ikuti Sistem', ThemeMode.system, current),
@@ -351,13 +403,79 @@ class _ThemeSheet extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       leading: Icon(
         selected ? Icons.radio_button_checked : Icons.radio_button_off,
-        color: selected ? AppColors.purpleAccent : Colors.white70,
+        color: selected 
+            ? Theme.of(context).colorScheme.primary 
+            : Theme.of(context).colorScheme.onSurfaceVariant,
       ),
-      title: Text(label, style: const TextStyle(color: Colors.white)),
+      title: Text(
+        label, 
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
       onTap: () async {
         await tp.setMode(mode);
         if (context.mounted) Navigator.pop(context);
       },
+    );
+  }
+}
+
+class _LoginRequiredWidget extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.person_outline,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Login Required',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Please login to access your profile and personal features',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () async {
+                final success = await AuthHelper.requireAuth(context);
+                if (success && context.mounted) {
+                  // Refresh the screen to show profile
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.purpleAccent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Login Now'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

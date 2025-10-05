@@ -13,7 +13,7 @@ class SearchService {
     final q = query.trim();
     if (q.isEmpty) return;
     final sp = SharedPrefsService();
-    final list = await sp.getStringList(_key);
+    final list = List<String>.from(await sp.getStringList(_key));
     list.removeWhere((e) => e.toLowerCase() == q.toLowerCase());
     list.insert(0, q);
     while (list.length > 12) {

@@ -20,15 +20,15 @@ class UserListScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
-        backgroundColor: AppColors.black,
-        foregroundColor: AppColors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
       ),
-      backgroundColor: AppColors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: uid == null
-          ? const Center(
+          ? Center(
               child: Text(
                 'Login required',
-                style: TextStyle(color: AppColors.white),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
               ),
             )
           : StreamBuilder<List<Map<String, dynamic>>>(
@@ -36,17 +36,17 @@ class UserListScreen extends StatelessWidget {
               builder: (context, snap) {
                 final items = snap.data ?? const [];
                 if (items.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
                       'No users',
-                      style: TextStyle(color: AppColors.whiteSecondary),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   );
                 }
                 return ListView.separated(
                   itemCount: items.length,
                   separatorBuilder: (_, __) =>
-                      const Divider(height: 1, color: Color(0xFF22252B)),
+                      Divider(height: 1, color: Theme.of(context).dividerTheme.color),
                   itemBuilder: (context, i) {
                     final m = items[i];
                     final otherId = isFollowers
@@ -63,22 +63,22 @@ class UserListScreen extends StatelessWidget {
                         final handle = profile?.handle;
                         return ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: AppColors.purpleAccent.withValues(
-                              alpha: 0.2,
-                            ),
+                            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                             backgroundImage: (photo != null && photo.isNotEmpty)
                                 ? NetworkImage(photo)
                                 : null,
                             child: (photo == null || photo.isEmpty)
                                 ? Text(
                                     _initials(displayName),
-                                    style: const TextStyle(color: Colors.white),
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                    ),
                                   )
                                 : null,
                           ),
                           title: Text(
                             displayName,
-                            style: const TextStyle(color: AppColors.white),
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                           ),
                           subtitle: Text(
                             handle == null || handle.isEmpty
@@ -86,8 +86,8 @@ class UserListScreen extends StatelessWidget {
                                 : (handle.startsWith('@')
                                       ? handle
                                       : '@$handle'),
-                            style: const TextStyle(
-                              color: AppColors.whiteSecondary,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                           trailing: isSelf
@@ -104,14 +104,14 @@ class UserListScreen extends StatelessWidget {
                                       ),
                                       style: FilledButton.styleFrom(
                                         backgroundColor: isFollowing
-                                            ? const Color(0xFF2A2E35)
-                                            : AppColors.purpleAccent,
+                                            ? Theme.of(context).colorScheme.surfaceContainerHighest
+                                            : Theme.of(context).colorScheme.primary,
                                       ),
                                       child: Text(
                                         isFollowing ? 'Following' : 'Follow',
                                         style: TextStyle(
                                           color: isFollowing
-                                              ? AppColors.whiteSecondary
+                                              ? Theme.of(context).colorScheme.onSurface
                                               : Colors.white,
                                         ),
                                       ),

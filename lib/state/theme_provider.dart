@@ -5,6 +5,14 @@ class ThemeProvider extends ChangeNotifier {
   static const _key = 'theme_mode';
   ThemeMode _mode = ThemeMode.system;
   ThemeMode get mode => _mode;
+  ThemeMode get themeMode => _mode;
+  
+  bool get isDarkMode {
+    if (_mode == ThemeMode.system) {
+      return WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+    }
+    return _mode == ThemeMode.dark;
+  }
 
   Future<void> load() async {
     final sp = SharedPrefsService(namespace: 'coment');
