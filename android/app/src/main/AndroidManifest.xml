@@ -7,7 +7,7 @@
     <application
         android:label="Nandogami"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -26,9 +26,7 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <meta-data
-            android:name="flutterEmbedding"
-            android:value="2" />
+        <meta-data android:name="flutterEmbedding" android:value="2"/>
     </application>
     <queries>
         <intent>
