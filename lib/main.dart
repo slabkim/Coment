@@ -5,6 +5,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:provider/provider.dart';
 import 'dart:ui' as ui;
 
 import 'core/constants.dart';
@@ -12,6 +14,9 @@ import 'firebase_options.dart';
 import 'ui/screens/splash_screen.dart';
 import 'core/theme.dart';
 import 'ui/screens/chat_list_screen.dart';
+import 'state/item_provider.dart';
+import 'state/theme_provider.dart';
+import 'data/repositories/comic_repository.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -53,13 +58,17 @@ Future<void> _configureMessaging() async {
     if (ctx == null) return;
     final title = message.notification?.title ?? 'New notification';
     final body = message.notification?.body ?? '';
-    ScaffoldMessenger.of(ctx).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text([title, body].where((e) => e.isNotEmpty).join(' — ')),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    
+    // Use post-frame callback to avoid calling showSnackBar during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text([title, body].where((e) => e.isNotEmpty).join(' — ')),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    });
   });
 
   // Notification opened
@@ -77,6 +86,10 @@ Future<void> _configureMessaging() async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
+  
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Crashlytics
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -104,14 +117,20 @@ class NandogamiBootstrap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: appNavigatorKey,
-      debugShowCheckedModeBanner: false,
-      title: AppConst.appName,
-      theme: NandogamiTheme.light,
-      darkTheme: NandogamiTheme.dark,
-      themeMode: ThemeMode.system,
-      home: const SplashScreen(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ItemProvider(ComicRepository())),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+      ],
+      child: MaterialApp(
+        navigatorKey: appNavigatorKey,
+        debugShowCheckedModeBanner: false,
+        title: AppConst.appName,
+        theme: NandogamiTheme.light,
+        darkTheme: NandogamiTheme.dark,
+        themeMode: ThemeMode.system,
+        home: const SplashScreen(),
+      ),
     );
   }
 }

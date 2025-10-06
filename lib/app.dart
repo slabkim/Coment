@@ -7,8 +7,7 @@ import 'package:provider/provider.dart';
 
 import 'core/constants.dart';
 import 'data/models/nandogami_item.dart';
-import 'data/repositories/nandogami_repository.dart';
-import 'data/services/api_service.dart';
+import 'data/repositories/comic_repository.dart';
 import 'state/item_provider.dart';
 import 'state/theme_provider.dart';
 import 'ui/screens/detail_screen.dart';
@@ -24,7 +23,7 @@ class NandogamiApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => ItemProvider(NandogamiRepository(ApiService())),
+          create: (_) => ItemProvider(ComicRepository()),
         ),
         ChangeNotifierProvider(
           create: (_) => ThemeProvider()..load(),
@@ -69,22 +68,8 @@ class _AuthGateState extends State<_AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        if (snapshot.hasData) {
-          return const MainScreen();
-        }
-
-        return const LoginRegisterScreen();
-      },
-    );
+    // Langsung ke MainScreen tanpa cek autentikasi
+    return const MainScreen();
   }
 
   Future<void> _initDynamicLinks() async {

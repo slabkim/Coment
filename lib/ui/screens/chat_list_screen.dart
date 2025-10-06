@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
+import '../../core/auth_helper.dart';
 import '../../data/models/chat.dart';
 import '../../data/models/user_profile.dart';
 import '../../data/services/chat_history_service.dart';
@@ -21,17 +22,12 @@ class ChatListScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Direct Messages'),
-        backgroundColor: AppColors.black,
-        foregroundColor: AppColors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
       ),
-      backgroundColor: AppColors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: uid == null
-          ? const Center(
-              child: Text(
-                'Login required',
-                style: TextStyle(color: AppColors.white),
-              ),
-            )
+          ? _LoginRequiredWidget()
           : StreamBuilder<List<Chat>>(
               stream: chatService.watchUserChats(uid),
               builder: (context, snapshot) {
@@ -40,10 +36,10 @@ class ChatListScreen extends StatelessWidget {
                 }
                 final chats = snapshot.data ?? const [];
                 if (chats.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
                       'No chats yet',
-                      style: TextStyle(color: AppColors.whiteSecondary),
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   );
                 }
@@ -83,8 +79,8 @@ class ChatListScreen extends StatelessWidget {
                           ),
                           title: Text(
                             displayName,
-                            style: const TextStyle(
-                              color: AppColors.white,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -92,9 +88,9 @@ class ChatListScreen extends StatelessWidget {
                             subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.whiteSecondary,
-                            ),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                           ),
                           trailing: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -102,8 +98,8 @@ class ChatListScreen extends StatelessWidget {
                               if (timeLabel != null)
                                 Text(
                                   timeLabel,
-                                  style: const TextStyle(
-                                    color: AppColors.whiteSecondary,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                                     fontSize: 11,
                                   ),
                                 ),
@@ -165,4 +161,64 @@ String _initials(String name) {
       : 'U';
   final second = parts.length > 1 && parts.last.isNotEmpty ? parts.last[0] : '';
   return (first + second).toUpperCase();
+}
+
+class _LoginRequiredWidget extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.chat_outlined,
+              size: 64,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Login Required',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Please login to access Direct Messages and chat with other users',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () async {
+                final success = await AuthHelper.requireAuth(context);
+                if (success && context.mounted) {
+                  // Refresh the screen to show chats
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (_) => const ChatListScreen()),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.purpleAccent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Login Now'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

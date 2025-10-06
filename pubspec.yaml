@@ -25,7 +25,9 @@ dependencies:
   image_picker: ^1.1.2
   app_links: ^6.3.2
   rxdart: ^0.27.7
-  rename_app: ^1.6.5
+  url_launcher: ^6.3.0
+  flutter_dotenv: ^5.1.0
+  google_sign_in: ^6.2.1
 
 dev_dependencies:
   flutter_test:
@@ -38,6 +40,7 @@ flutter:
   assets:
     - assets/images/
     - lib/assets/legacy/
+    - .env
 
 flutter_icons:
   android: true

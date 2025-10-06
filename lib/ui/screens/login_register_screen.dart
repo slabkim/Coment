@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/services.dart';
 import '../../data/services/user_service.dart';
 import '../../../core/constants.dart';
 
@@ -51,7 +53,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
         password: _passwordC.text.trim(),
       );
       if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(true); // Return true untuk success
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _error = e.message ?? 'Login gagal');
@@ -89,7 +91,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
         );
       }
       if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(true); // Return true untuk success
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _error = e.message ?? 'Registrasi gagal');
@@ -113,6 +115,89 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _error = e.message ?? 'Gagal mengirim tautan reset.');
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      debugPrint('=== GOOGLE SIGN-IN DEBUG ===');
+      debugPrint('Starting Google Sign-In process...');
+      
+      // Configure Google Sign-In
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+      );
+      
+      debugPrint('GoogleSignIn configured without serverClientId (using google-services.json)');
+      
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      debugPrint('Google Sign-In result: ${googleUser != null ? "Success" : "User cancelled"}');
+      
+      if (googleUser == null) {
+        debugPrint('User cancelled Google Sign-In');
+        setState(() => _busy = false);
+        return;
+      }
+
+      debugPrint('Google User ID: ${googleUser.id}');
+      debugPrint('Google User Email: ${googleUser.email}');
+      debugPrint('Google User Display Name: ${googleUser.displayName}');
+      
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      debugPrint('Google Auth tokens received');
+      debugPrint('Access Token: ${googleAuth.accessToken != null ? "Present" : "Missing"}');
+      debugPrint('ID Token: ${googleAuth.idToken != null ? "Present" : "Missing"}');
+      
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      debugPrint('Firebase credential created');
+
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      final user = userCredential.user;
+      debugPrint('Firebase Auth successful: ${user != null}');
+      
+      if (user != null) {
+        debugPrint('Creating user document...');
+        await UserService().ensureUserDoc(
+          uid: user.uid,
+          email: user.email ?? '',
+          displayName: user.displayName ?? user.email?.split('@').first ?? 'User',
+          photoUrl: user.photoURL,
+        );
+        debugPrint('User document created successfully');
+      }
+      
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true); // Return true untuk success
+      }
+      debugPrint('=== GOOGLE SIGN-IN SUCCESS ===');
+    } catch (e) {
+      debugPrint('=== GOOGLE SIGN-IN ERROR ===');
+      debugPrint('Google Sign-In Error: $e');
+      debugPrint('Error type: ${e.runtimeType}');
+      if (e is PlatformException) {
+        debugPrint('Platform error code: ${e.code}');
+        debugPrint('Platform error message: ${e.message}');
+        debugPrint('Platform error details: ${e.details}');
+        
+        // Specific error handling for ApiException: 10
+        if (e.code == 'sign_in_failed' && e.message?.contains('ApiException: 10') == true) {
+          debugPrint('DEVELOPER_ERROR: This usually means:');
+          debugPrint('1. Package name mismatch between Firebase and Google Cloud Console');
+          debugPrint('2. SHA-1 fingerprint mismatch');
+          debugPrint('3. OAuth Client ID configuration issue');
+          debugPrint('4. OAuth Consent Screen not properly configured');
+        }
+      }
+      setState(() => _error = 'Google Sign-In gagal: ${e.toString()}');
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -251,6 +336,32 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                     child: _GradientButton(
                       text: _isLogin ? 'Log In' : 'Sign Up',
                       onPressed: _isLogin ? _doLogin : _doSignup,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+                  // Divider
+                  Row(
+                    children: [
+                      const Expanded(child: Divider(color: Color(0xFF2A2E35))),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'atau',
+                          style: TextStyle(color: AppColors.whiteSecondary),
+                        ),
+                      ),
+                      const Expanded(child: Divider(color: Color(0xFF2A2E35))),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Google Sign-In button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: _GoogleSignInButton(
+                      onPressed: _signInWithGoogle,
                     ),
                   ),
 
@@ -587,15 +698,57 @@ class _GradientButton extends StatelessWidget {
             ),
             borderRadius: BorderRadius.all(Radius.circular(12)),
           ),
-          child: const Center(
+          child: Center(
             child: Text(
-              'Button',
-              style: TextStyle(
+              text,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GoogleSignInButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _GoogleSignInButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF2A2E35)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.g_mobiledata,
+                color: Colors.red,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Continue with Google',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
       ),

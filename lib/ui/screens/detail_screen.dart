@@ -4,13 +4,21 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/constants.dart'; // pastikan punya AppColors & AppConst
+import '../../core/constants.dart';
+import '../../core/auth_helper.dart'; 
 import '../../data/models/nandogami_item.dart';
+import '../../data/models/external_link.dart';
+import '../../data/repositories/comic_repository.dart';
 import '../../data/services/comments_service.dart';
 import '../../data/services/favorite_service.dart';
 import '../../data/services/reading_status_service.dart';
+import '../../data/services/simple_anilist_service.dart';
 import '../../state/item_provider.dart';
+import '../widgets/dynamic_wallpaper.dart';
+import '../widgets/comic_detail_header.dart';
+import '../widgets/about_tab_new.dart';
 import 'user_public_profile_screen.dart';
 
 class DetailScreen extends StatelessWidget {
@@ -23,132 +31,126 @@ class DetailScreen extends StatelessWidget {
     final favService = FavoriteService();
     final statusService = ReadingStatusService();
 
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        backgroundColor: AppColors.black,
-        body: NestedScrollView(
-          headerSliverBuilder: (context, inner) => [
-            SliverAppBar(
-              backgroundColor: AppColors.black,
-              expandedHeight: 300,
-              pinned: true,
-              elevation: 0,
-              centerTitle: false,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => Navigator.pop(context),
-              ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.share),
-                  onPressed: () async {
-                    final uri = Uri(
-                      scheme: 'https',
-                      host: 'nandogami.app',
-                      path: '/title/${item.id}',
-                    );
-                    // Use share_plus
-                    await Share.share('Check this out: $uri');
-                  },
-                ),
-              ],
-              flexibleSpace: FlexibleSpaceBar(
-                collapseMode: CollapseMode.parallax,
-                background: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Cover
-                    CachedNetworkImage(
-                      imageUrl: item.imageUrl,
-                      fit: BoxFit.cover,
-                      placeholder: (c, _) =>
-                          const Center(child: CircularProgressIndicator()),
-                      errorWidget: (c, _, __) => const ColoredBox(
-                        color: Colors.black,
-                        child: Center(
-                          child: Icon(
-                            Icons.broken_image,
-                            color: Colors.white54,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // dark gradient scrim
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Colors.transparent, Colors.black54],
-                        ),
-                      ),
-                    ),
-                    // Favorite big button (56dp) bottom|end
-                    if (currentUid != null)
-                      Positioned(
-                        right: 16,
-                        bottom: 16,
-                        child: StreamBuilder<bool>(
-                          stream: favService.isFavoriteStream(
-                            userId: currentUid,
-                            titleId: item.id,
-                          ),
-                          builder: (context, snap) {
-                            final isFav = snap.data ?? false;
-                            return Material(
-                              color: Colors.black.withValues(alpha: 0.45),
-                              shape: const CircleBorder(),
-                              clipBehavior: Clip.antiAlias,
-                              child: IconButton(
-                                iconSize: 28,
-                                color: isFav ? Colors.pinkAccent : Colors.white,
-                                icon: Icon(
-                                  isFav
-                                      ? Icons.favorite
-                                      : Icons.favorite_border,
-                                ),
-                                onPressed: () {
-                                  HapticFeedback.lightImpact();
-                                  favService.toggleFavorite(
-                                    userId: currentUid,
-                                    titleId: item.id,
-                                  );
-                                },
-                              ),
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+             body: DefaultTabController(
+               length: 3, // Only 3 tabs: About, Where to Read, Comments
+               child: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) {
+            return [
+              StreamBuilder<bool>(
+                stream: currentUid != null 
+                    ? favService.isFavoriteStream(
+                        userId: currentUid!,
+                        titleId: item.id,
+                      )
+                    : Stream.value(false),
+                builder: (context, snap) {
+                  final isFav = snap.data ?? false;
+                  return SliverAppBar(
+                    expandedHeight: 280,
+                    floating: false,
+                    pinned: true,
+                    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                    flexibleSpace: FlexibleSpaceBar(
+                      background: ComicDetailHeader(
+                        item: item,
+                        isFavorite: isFav,
+                        onFavoriteToggle: () async {
+                          final success = await AuthHelper.requireAuthWithDialog(
+                            context, 
+                            'add this manga to your favorites'
+                          );
+                          if (success && currentUid != null) {
+                            HapticFeedback.lightImpact();
+                            await favService.toggleFavorite(
+                              userId: currentUid!,
+                              titleId: item.id,
                             );
-                          },
-                        ),
+                          }
+                        },
+                        onShare: () async {
+                          final uri = Uri(
+                            scheme: 'https',
+                            host: 'nandogami.app',
+                            path: '/title/${item.id}',
+                          );
+                          await Share.share('Check this out: $uri');
+                        },
                       ),
-                  ],
+                    ),
+                    actions: [
+                      IconButton(
+                        icon: Icon(Icons.share, color: Theme.of(context).colorScheme.onSurface),
+                        onPressed: () async {
+                          final uri = Uri(
+                            scheme: 'https',
+                            host: 'nandogami.app',
+                            path: '/title/${item.id}',
+                          );
+                          await Share.share('Check this out: $uri');
+                        },
+                      ),
+                    ],
+                  );
+                },
+              ),
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _SliverAppBarDelegate(
+                  TabBar(
+                    labelColor: Theme.of(context).colorScheme.primary,
+                    unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                    indicatorColor: Theme.of(context).colorScheme.primary,
+                                 tabs: const [
+                                   Tab(text: 'About'),
+                                   Tab(text: 'Where to Read'),
+                                   Tab(text: 'Comments'),
+                                 ],
+                  ),
                 ),
               ),
-              bottom: const TabBar(
-                labelColor: AppColors.purpleAccent,
-                unselectedLabelColor: AppColors.whiteSecondary,
-                indicatorColor: AppColors.purpleAccent,
-                tabs: [
-                  Tab(text: 'About'),
-                  Tab(text: 'Where to Read'),
-                  Tab(text: 'Comments'),
-                ],
-              ),
-            ),
-          ],
-          body: TabBarView(
-            children: [
-              _AboutTab(
-                item: item,
-                uid: currentUid,
-                statusService: statusService,
-              ),
-              const _WhereToReadTab(),
-              _CommentsTab(titleId: item.id),
-            ],
-          ),
+            ];
+          },
+                 body: TabBarView(
+                   children: [
+                     AboutTabNew(
+                       item: item,
+                       uid: currentUid,
+                       statusService: statusService,
+                     ),
+                     _WhereToReadTab(item: item),
+                     _CommentsTab(titleId: item.id),
+                   ],
+                 ),
         ),
       ),
     );
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar _tabBar;
+
+  _SliverAppBarDelegate(this._tabBar);
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height;
+
+  @override
+  double get maxExtent => _tabBar.preferredSize.height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: _tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
   }
 }
 
@@ -182,7 +184,7 @@ class _AboutTab extends StatelessWidget {
           Text(
             item.title,
             style: theme.titleLarge?.copyWith(
-              color: AppColors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -193,7 +195,7 @@ class _AboutTab extends StatelessWidget {
             Text(
               item.author!,
               style: theme.bodyMedium?.copyWith(
-                color: AppColors.whiteSecondary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -209,8 +211,8 @@ class _AboutTab extends StatelessWidget {
               ),
               child: Text(
                 item.type!,
-                style: const TextStyle(
-                  color: AppColors.white,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -225,13 +227,13 @@ class _AboutTab extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 (item.rating ?? 0).toStringAsFixed(1),
-                style: const TextStyle(color: AppColors.white),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
               ),
               if ((item.ratingCount ?? 0) > 0) ...[
                 const SizedBox(width: 4),
                 Text(
                   '(${item.ratingCount} ratings)',
-                  style: const TextStyle(color: AppColors.whiteSecondary),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ],
             ],
@@ -247,8 +249,8 @@ class _AboutTab extends StatelessWidget {
                   .map(
                     (e) => Chip(
                       label: Text(e),
-                      backgroundColor: const Color(0xFF2A2E35),
-                      labelStyle: const TextStyle(color: AppColors.white),
+                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      labelStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                     ),
                   )
                   .toList(),
@@ -327,8 +329,8 @@ class _AboutTab extends StatelessWidget {
                   .map(
                     (e) => Chip(
                       label: Text(e),
-                      backgroundColor: const Color(0xFF2A2E35),
-                      labelStyle: const TextStyle(color: AppColors.white),
+                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      labelStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                     ),
                   )
                   .toList(),
@@ -350,6 +352,29 @@ class _AboutTab extends StatelessWidget {
               ),
               _AdaptationTile(title: 'Light Novel', subtitle: 'Publisher ABC'),
             ],
+          ),
+
+          // Visual Inspiration
+          const SizedBox(height: 24),
+          Text(
+            'Visual Inspiration',
+            style: theme.titleMedium?.copyWith(color: AppColors.white),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 120,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: categories.length,
+              itemBuilder: (context, index) {
+                return GenreWallpaperCard(
+                  genre: categories[index],
+                  onTap: () {
+                    // Optional: Show full screen wallpaper
+                  },
+                );
+              },
+            ),
           ),
 
           // Discover horizontal
@@ -375,36 +400,424 @@ class _AboutTab extends StatelessWidget {
 }
 
 /// ---------------- WHERE TO READ TAB ----------------
-class _WhereToReadTab extends StatelessWidget {
-  const _WhereToReadTab();
+class _WhereToReadTab extends StatefulWidget {
+  final NandogamiItem item;
+  
+  const _WhereToReadTab({required this.item});
+
+  @override
+  State<_WhereToReadTab> createState() => _WhereToReadTabState();
+}
+
+class _WhereToReadTabState extends State<_WhereToReadTab> {
+  List<ExternalLink>? _externalLinks;
+  bool _loadingExternalLinks = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExternalLinks();
+  }
+
+  Future<void> _loadExternalLinks() async {
+    if (!mounted) return;
+    
+    setState(() {
+      _loadingExternalLinks = true;
+    });
+
+    try {
+      final mangaService = SimpleAniListService();
+      final mangaId = int.tryParse(widget.item.id);
+      
+      if (mangaId != null) {
+        // Use retry mechanism for better reliability
+        final externalLinks = await mangaService.getMangaExternalLinksWithRetry(mangaId);
+        if (!mounted) return;
+        setState(() {
+          _externalLinks = externalLinks;
+          _loadingExternalLinks = false;
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _externalLinks = [];
+          _loadingExternalLinks = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading external links: $e');
+      if (!mounted) return;
+      setState(() {
+        _externalLinks = [];
+        _loadingExternalLinks = false;
+      });
+    }
+  }
+
+  /// Refresh external links (clear cache and reload)
+  Future<void> _refreshExternalLinks() async {
+    // Clear cache before reloading
+    SimpleAniListService.clearExternalLinksCache();
+    await _loadExternalLinks();
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loadingExternalLinks) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    final links = _externalLinks ?? [];
+    
+    if (links.isEmpty) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.link_off,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                size: 64,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No External Links Available',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'This manga doesn\'t have any official external links yet.',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _refreshExternalLinks,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Group links by type
+    final streamingLinks = links.where((link) => link.isStreaming).toList();
+    final readingLinks = links.where((link) => link.isReading).toList();
+    final merchandiseLinks = links.where((link) => link.isMerchandise).toList();
+    final otherLinks = links.where((link) => 
+      !link.isStreaming && !link.isReading && !link.isMerchandise
+    ).toList();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          _ServiceCard(
-            title: 'Manga Plus',
-            subtitle: 'Official Shueisha platform',
-            badge: 'FREE',
-          ),
-          SizedBox(height: 12),
-          _ServiceCard(
-            title: 'VIZ Media',
-            subtitle: 'Official English publisher',
-            badge: '\$1.99',
-          ),
-          SizedBox(height: 12),
-          _ServiceCard(
-            title: 'Crunchyroll Manga',
-            subtitle: 'Subscription required',
-            badge: 'PREMIUM',
-          ),
+        children: [
+          if (streamingLinks.isNotEmpty) ...[
+            _buildSectionHeader('Streaming Services', Icons.play_circle_outline),
+            const SizedBox(height: 12),
+            ...streamingLinks.map((link) => _ExternalLinkCard(link: link)),
+            const SizedBox(height: 24),
+          ],
+          
+          if (readingLinks.isNotEmpty) ...[
+            _buildSectionHeader('Reading Platforms', Icons.menu_book),
+            const SizedBox(height: 12),
+            ...readingLinks.map((link) => _ExternalLinkCard(link: link)),
+            const SizedBox(height: 24),
+          ],
+          
+          if (merchandiseLinks.isNotEmpty) ...[
+            _buildSectionHeader('Merchandise', Icons.shopping_bag),
+            const SizedBox(height: 12),
+            ...merchandiseLinks.map((link) => _ExternalLinkCard(link: link)),
+            const SizedBox(height: 24),
+          ],
+          
+          if (otherLinks.isNotEmpty) ...[
+            _buildSectionHeader('Other Links', Icons.link),
+            const SizedBox(height: 12),
+            ...otherLinks.map((link) => _ExternalLinkCard(link: link)),
+          ],
         ],
       ),
     );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, color: Theme.of(context).colorScheme.primary, size: 20),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// ---------------- EXTERNAL LINK CARD ----------------
+class _ExternalLinkCard extends StatelessWidget {
+  final ExternalLink link;
+  
+  const _ExternalLinkCard({required this.link});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline,
+          width: 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openLink(context, link.url),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Icon
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: _getIconBackgroundColor(),
+                  ),
+                  child: _buildIcon(),
+                ),
+                
+                const SizedBox(width: 16),
+                
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        link.displayName,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _getSubtitle(),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Arrow icon
+                Icon(
+                  Icons.arrow_forward_ios,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIcon() {
+    // Try to use AniList icon URL first (these are usually good quality)
+    if (link.icon != null && link.icon!.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: CachedNetworkImage(
+          imageUrl: link.icon!,
+          width: 48,
+          height: 48,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => _buildColoredIcon(),
+          errorWidget: (context, url, error) => _buildColoredIcon(),
+        ),
+      );
+    }
+    
+    // Fallback to colored Material icon only if no AniList icon
+    return _buildColoredIcon();
+  }
+
+  Widget _buildColoredIcon() {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: _getIconBackgroundColor(),
+      ),
+      child: Icon(
+        _getIconData(),
+        color: _getIconColor(),
+        size: 24,
+      ),
+    );
+  }
+
+  void _openLink(BuildContext context, String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not open $url'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening link: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  IconData _getIconData() {
+    final site = link.site.toLowerCase().trim();
+    
+    // Reading platforms
+    if (site.contains('webtoon')) return Icons.auto_stories;
+    if (site.contains('tapas')) return Icons.menu_book;
+    if (site.contains('kakaopage')) return Icons.library_books;
+    if (site.contains('naver')) return Icons.web;
+    if (site.contains('manga plus')) return Icons.auto_stories;
+    if (site.contains('viz')) return Icons.library_books;
+    if (site.contains('manga')) return Icons.book;
+    if (site.contains('novel')) return Icons.book;
+    if (site.contains('book')) return Icons.book;
+    
+    // Streaming platforms
+    if (site.contains('crunchyroll')) return Icons.play_circle_filled;
+    if (site.contains('netflix')) return Icons.play_circle_filled;
+    if (site.contains('hulu')) return Icons.play_circle_filled;
+    if (site.contains('amazon')) return Icons.shopping_cart;
+    if (site.contains('disney')) return Icons.play_circle_filled;
+    if (site.contains('hbo')) return Icons.play_circle_filled;
+    if (site.contains('vrv')) return Icons.play_circle_filled;
+    if (site.contains('hidive')) return Icons.play_circle_filled;
+    if (site.contains('retrocrush')) return Icons.play_circle_filled;
+    if (site.contains('tubi')) return Icons.play_circle_filled;
+    if (site.contains('funimation')) return Icons.play_circle_filled;
+    if (site.contains('anime')) return Icons.play_circle_filled;
+    
+    // Merchandise
+    if (site.contains('dvd')) return Icons.movie;
+    if (site.contains('blu-ray')) return Icons.movie;
+    if (site.contains('cd')) return Icons.album;
+    if (site.contains('vinyl')) return Icons.album;
+    if (site.contains('cassette')) return Icons.album;
+    if (site.contains('music')) return Icons.music_note;
+    if (site.contains('game')) return Icons.sports_esports;
+    
+    // Default fallback
+    return Icons.link;
+  }
+
+  Color _getIconBackgroundColor() {
+    final site = link.site.toLowerCase().trim();
+    
+    // Reading platforms
+    if (site.contains('webtoon')) return const Color(0xFF00D4AA); // Webtoon green
+    if (site.contains('tapas')) return const Color(0xFFFF6B6B); // Tapas red
+    if (site.contains('kakaopage')) return const Color(0xFFFFC107); // KakaoPage yellow
+    if (site.contains('naver')) return const Color(0xFF03C75A); // Naver green
+    if (site.contains('manga plus')) return const Color(0xFF2196F3); // Manga Plus blue
+    if (site.contains('viz')) return const Color(0xFF4CAF50); // VIZ green
+    if (site.contains('manga')) return const Color(0xFF9C27B0); // Manga purple
+    if (site.contains('novel')) return const Color(0xFF795548); // Novel brown
+    if (site.contains('book')) return const Color(0xFF795548); // Book brown
+    
+    // Streaming platforms
+    if (site.contains('crunchyroll')) return const Color(0xFFF78C25); // Crunchyroll orange
+    if (site.contains('netflix')) return const Color(0xFFE50914); // Netflix red
+    if (site.contains('hulu')) return const Color(0xFF1CE783); // Hulu green
+    if (site.contains('amazon')) return const Color(0xFFFF9900); // Amazon orange
+    if (site.contains('disney')) return const Color(0xFF113CCF); // Disney blue
+    if (site.contains('hbo')) return const Color(0xFF8B5CF6); // HBO purple
+    if (site.contains('vrv')) return const Color(0xFF00D4AA); // VRV green
+    if (site.contains('hidive')) return const Color(0xFF00D4AA); // HIDIVE green
+    if (site.contains('retrocrush')) return const Color(0xFFFF6B6B); // RetroCrush red
+    if (site.contains('tubi')) return const Color(0xFF00D4AA); // Tubi green
+    if (site.contains('funimation')) return const Color(0xFF00D4AA); // Funimation green
+    if (site.contains('anime')) return const Color(0xFF2196F3); // Anime blue
+    
+    // Merchandise
+    if (site.contains('dvd')) return const Color(0xFF607D8B); // DVD grey
+    if (site.contains('blu-ray')) return const Color(0xFF2196F3); // Blu-ray blue
+    if (site.contains('cd')) return const Color(0xFF9C27B0); // CD purple
+    if (site.contains('vinyl')) return const Color(0xFF795548); // Vinyl brown
+    if (site.contains('cassette')) return const Color(0xFFFF9800); // Cassette orange
+    if (site.contains('music')) return const Color(0xFF9C27B0); // Music purple
+    if (site.contains('game')) return const Color(0xFF4CAF50); // Game green
+    
+    // Default fallback
+    return const Color(0xFF6C757D); // Default grey
+  }
+
+  Color _getIconColor() {
+    return Colors.white;
+  }
+
+  String _getSubtitle() {
+    if (link.isStreaming) {
+      return 'Stream this series';
+    } else if (link.isReading) {
+      return 'Read this series';
+    } else if (link.isMerchandise) {
+      return 'Buy merchandise';
+    } else {
+      return 'Visit official page';
+    }
   }
 }
 
@@ -443,12 +856,12 @@ class _CommentsTabState extends State<_CommentsTab> {
                   controller: _c,
                   minLines: 1,
                   maxLines: 3,
-                  style: const TextStyle(color: AppColors.white),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                   decoration: InputDecoration(
                     hintText: 'Add a comment...',
-                    hintStyle: const TextStyle(color: AppColors.whiteSecondary),
+                    hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                     filled: true,
-                    fillColor: const Color(0xFF2A2E35),
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 12,
@@ -465,7 +878,7 @@ class _CommentsTabState extends State<_CommentsTab> {
               FilledButton(
                 onPressed: () => _post(uid),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.purpleAccent,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
                 ),
                 child: const Text('Post'),
               ),
@@ -478,10 +891,10 @@ class _CommentsTabState extends State<_CommentsTab> {
             builder: (context, snapshot) {
               final items = snapshot.data ?? const [];
               if (items.isEmpty) {
-                return const Center(
+                return Center(
                   child: Text(
                     'No comments yet',
-                    style: TextStyle(color: AppColors.whiteSecondary),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 );
               }
@@ -502,13 +915,23 @@ class _CommentsTabState extends State<_CommentsTab> {
   }
 
   Future<void> _post(String? uid) async {
-    if (uid == null) return;
     final text = _c.text.trim();
     if (text.isEmpty) return;
+    
+    // Cek autentikasi dulu
+    final success = await AuthHelper.requireAuthWithDialog(
+      context, 
+      'post a comment'
+    );
+    if (!success) return;
+    
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid == null) return;
+    
     final user = FirebaseAuth.instance.currentUser;
     await _svc.addComment(
       titleId: widget.titleId,
-      userId: uid,
+      userId: currentUid,
       text: text,
       userName: user?.displayName,
       userAvatar: user?.photoURL,
@@ -533,7 +956,7 @@ class _CommentTile extends StatelessWidget {
     final timeLabel = _timeAgo(model.createdAt);
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1E232B),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(10),
       ),
       child: ListTile(
@@ -542,7 +965,7 @@ class _CommentTile extends StatelessWidget {
           vertical: 12,
         ),
         leading: CircleAvatar(
-          backgroundColor: AppColors.purpleAccent.withValues(alpha: 0.2),
+          backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
           backgroundImage:
               (model.userAvatar != null && model.userAvatar!.isNotEmpty)
               ? NetworkImage(model.userAvatar!)
@@ -550,14 +973,14 @@ class _CommentTile extends StatelessWidget {
           child: (model.userAvatar == null || model.userAvatar!.isEmpty)
               ? Text(
                   _initials(model.userName),
-                  style: const TextStyle(color: AppColors.white),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                 )
               : null,
         ),
         title: Text(
           model.userName ?? 'Anon',
-          style: const TextStyle(
-            color: AppColors.white,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -566,7 +989,7 @@ class _CommentTile extends StatelessWidget {
           children: [
             const SizedBox(height: 4),
             if (model.text.isNotEmpty)
-              Text(model.text, style: const TextStyle(color: AppColors.white)),
+              Text(model.text, style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
             if (model.imageUrl != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -583,8 +1006,8 @@ class _CommentTile extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               '$timeLabel • $likeLabel',
-              style: const TextStyle(
-                color: AppColors.whiteSecondary,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 12,
               ),
             ),
@@ -606,10 +1029,20 @@ class _CommentTile extends StatelessWidget {
                   final liked = snap.data ?? false;
                   return IconButton(
                     icon: Icon(liked ? Icons.favorite : Icons.favorite_border),
-                    color: liked ? Colors.pinkAccent : AppColors.whiteSecondary,
-                    onPressed: () => liked
-                        ? svc.unlike(commentId: model.id, userId: uid!)
-                        : svc.like(commentId: model.id, userId: uid!),
+                    color: liked ? Colors.pinkAccent : Theme.of(context).colorScheme.onSurfaceVariant,
+                    onPressed: () async {
+                      final success = await AuthHelper.requireAuthWithDialog(
+                        context, 
+                        'like this comment'
+                      );
+                      if (success && uid != null) {
+                        if (liked) {
+                          await svc.unlike(commentId: model.id, userId: uid!);
+                        } else {
+                          await svc.like(commentId: model.id, userId: uid!);
+                        }
+                      }
+                    },
                   );
                 },
               ),
@@ -918,6 +1351,7 @@ class _ReadingStatusPanel extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _statusBtn(
+                          context,
                           'plan',
                           'Plan to Read',
                           const Color(0xFF2563EB),
@@ -927,6 +1361,7 @@ class _ReadingStatusPanel extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _statusBtn(
+                          context,
                           'reading',
                           'Reading',
                           const Color(0xFF16A34A),
@@ -936,6 +1371,7 @@ class _ReadingStatusPanel extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _statusBtn(
+                          context,
                           'completed',
                           'Completed',
                           const Color(0xFF7C3AED),
@@ -949,6 +1385,7 @@ class _ReadingStatusPanel extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _statusBtn(
+                          context,
                           'dropped',
                           'Dropped',
                           const Color(0xFFDC2626),
@@ -958,6 +1395,7 @@ class _ReadingStatusPanel extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _statusBtn(
+                          context,
                           'on_hold',
                           'On Hold',
                           const Color(0xFFF59E0B),
@@ -975,15 +1413,23 @@ class _ReadingStatusPanel extends StatelessWidget {
     );
   }
 
-  Widget _statusBtn(String value, String text, Color color, String? current) {
+  Widget _statusBtn(BuildContext context, String value, String text, Color color, String? current) {
     return SizedBox(
       height: 40,
       child: FilledButton(
-        onPressed: () => statusService.setStatus(
-          userId: uid,
-          titleId: titleId,
-          status: value,
-        ),
+        onPressed: () async {
+          final success = await AuthHelper.requireAuthWithDialog(
+            context, 
+            'update your reading status'
+          );
+          if (success) {
+            await statusService.setStatus(
+              userId: uid,
+              titleId: titleId,
+              status: value,
+            );
+          }
+        },
         style: FilledButton.styleFrom(
           backgroundColor: current == value ? color : const Color(0xFF2A2E35),
           foregroundColor: current == value
@@ -995,3 +1441,4 @@ class _ReadingStatusPanel extends StatelessWidget {
     );
   }
 }
+

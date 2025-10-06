@@ -2,12 +2,12 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants.dart';
 import '../../data/services/user_service.dart';
+import '../../data/services/cloudinary_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -40,33 +40,43 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loadingInitial) {
-      return const Scaffold(
-        backgroundColor: AppColors.black,
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
       );
     }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Profile'),
-        backgroundColor: AppColors.black,
-        foregroundColor: AppColors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
         actions: [
           TextButton(
-            onPressed: _saving ? null : _save,
+            onPressed: _saving ? null : () {
+              print('Save button pressed'); // Debug log
+              _save();
+            },
             child: _saving
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   )
-                : const Text(
+                : Text(
                     'Save',
-                    style: TextStyle(color: AppColors.purpleAccent),
+                    style: TextStyle(color: Theme.of(context).colorScheme.primary),
                   ),
           ),
         ],
       ),
-      backgroundColor: AppColors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -77,9 +87,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               child: Container(
                 width: 96,
                 height: 96,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Color(0xFF3B2A58),
+                  color: Theme.of(context).colorScheme.primaryContainer,
                 ),
                 child: _avatarPreview(),
               ),
@@ -87,7 +97,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _nameC,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
               decoration: _decoration('Display name'),
             ),
             const SizedBox(height: 12),
@@ -95,7 +105,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               controller: _bioC,
               minLines: 3,
               maxLines: 5,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
               decoration: _decoration('Bio'),
             ),
           ],
@@ -106,9 +116,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   InputDecoration _decoration(String hint) => InputDecoration(
     hintText: hint,
-    hintStyle: const TextStyle(color: AppColors.whiteSecondary),
+    hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
     filled: true,
-    fillColor: const Color(0xFF121316),
+    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
@@ -117,43 +127,108 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   );
 
   Future<void> _save() async {
+    print('_save method called'); // Debug log
     setState(() => _saving = true);
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-      String? photoUrl;
-      if (_picked != null) {
-        final ref = FirebaseStorage.instance.ref('avatars/${user.uid}.jpg');
-        await ref.putData(await _picked!.readAsBytes());
-        photoUrl = await ref.getDownloadURL();
+      print('Current user: ${user?.uid}'); // Debug log
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('User not logged in'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
       }
+
       final newName = _nameC.text.trim();
       final newBio = _bioC.text.trim();
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'username': newName,
-        'bio': newBio,
-        if (photoUrl != null) 'photoUrl': photoUrl,
-        if (newName.isNotEmpty) 'usernameLower': newName.toLowerCase(),
-        'updatedAt': DateTime.now().millisecondsSinceEpoch,
-      }, SetOptions(merge: true));
-      if (photoUrl != null) {
-        _currentPhoto = photoUrl;
-        await user.updatePhotoURL(photoUrl);
+      
+      print('New name: $newName'); // Debug log
+      print('New bio: $newBio'); // Debug log
+
+      // Validate input
+      if (newName.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Display name cannot be empty'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
       }
-      if (newName.isNotEmpty) {
+
+      String? photoUrl;
+      if (_picked != null) {
+        try {
+          print('Uploading image to Cloudinary...'); // Debug log
+          photoUrl = await CloudinaryService.uploadImage(File(_picked!.path));
+          print('Image uploaded successfully: $photoUrl'); // Debug log
+        } catch (e) {
+          print('Error uploading to Cloudinary: $e'); // Debug log
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error uploading photo: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      // Update Firestore document
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'username': newName,
+          'bio': newBio,
+          if (photoUrl != null) 'photoUrl': photoUrl,
+          'usernameLower': newName.toLowerCase(),
+          'handle': newName.toLowerCase().replaceAll(' ', ''),
+          'handleLower': newName.toLowerCase().replaceAll(' ', ''),
+          'updatedAt': DateTime.now().millisecondsSinceEpoch,
+        }, SetOptions(merge: true));
+
+        // Update Firebase Auth profile
+        if (photoUrl != null) {
+          await user.updatePhotoURL(photoUrl);
+        }
         await user.updateDisplayName(newName);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile updated successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error updating profile: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'handle': newName.isNotEmpty
-            ? newName.toLowerCase().replaceAll(' ', '')
-            : user.email?.split('@').first,
-        'handleLower': (newName.isNotEmpty
-                ? newName.toLowerCase().replaceAll(' ', '')
-                : user.email?.split('@').first)
-            ?.toLowerCase(),
-      }, SetOptions(merge: true));
-      if (!mounted) return;
-      Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unexpected error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }

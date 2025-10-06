@@ -18,6 +18,16 @@ class AppColors {
   static const purple500 = Color(0xFF6200EE);
   static const purple700 = Color(0xFF3700B3);
 
+  // Modern gradient colors
+  static const purplePrimary = Color(0xFF8B5CF6);
+  static const purpleSecondary = Color(0xFFA855F7);
+  static const purpleTertiary = Color(0xFFC084FC);
+
+  // Accent colors for highlights
+  static const pinkAccent = Color(0xFFEC4899);
+  static const blueAccent = Color(0xFF3B82F6);
+  static const tealAccent = Color(0xFF14B8A6);
+
   static const blackDark = Color(0xFF121212);
   static const blackMedium = Color(0xFF1E1E1E);
   static const blackLight = Color(0xFF2D2D2D);
@@ -32,4 +42,5 @@ class AppColors {
   static const blue = Color(0xFF2196F3);
   static const red = Color(0xFFF44336);
   static const orange = Color(0xFFFF9800);
+  static const yellow = Color(0xFFFFC107);
 }

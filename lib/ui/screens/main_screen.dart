@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
+import 'home_screen_new.dart';
 import 'search_screen.dart';
+import 'news_screen.dart';
 import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -14,8 +15,9 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = [
-    const HomeScreen(),
+    const HomeScreenNew(),
     const SearchScreen(),
+    const NewsScreen(),
     const ProfileScreen(),
   ];
 
@@ -30,6 +32,7 @@ class _MainScreenState extends State<MainScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
+          BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: 'News'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),

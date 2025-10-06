@@ -1,12 +1,13 @@
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../data/services/shared_prefs_service.dart';
+import '../core/api_error_handler.dart';
 
 import '../data/models/nandogami_item.dart';
-import '../data/repositories/nandogami_repository.dart';
+import '../data/repositories/comic_repository.dart';
+import '../data/adapters/comic_adapter.dart';
 
 class ItemProvider extends ChangeNotifier {
-  final NandogamiRepository repo;
+  final ComicRepository repo;
 
   ItemProvider(this.repo);
 
@@ -16,13 +17,26 @@ class ItemProvider extends ChangeNotifier {
   List<NandogamiItem> _categoryPicks = [];
   List<NandogamiItem> _popular = [];
   List<NandogamiItem> _newReleases = [];
+  List<NandogamiItem> _topRated = [];
+  List<NandogamiItem> _trending = [];
+  List<NandogamiItem> _seasonal = [];
   bool _loading = false;
   String _query = '';
+  String? _error;
   Set<String> _favoriteIds = {};
 
   List<NandogamiItem> get items => _filtered;
+  List<NandogamiItem> get getFeatured => _featured;
+  List<NandogamiItem> get getCategories => _categoryPicks;
+  List<NandogamiItem> get getPopular => _popular;
+  List<NandogamiItem> get getNewReleases => _newReleases;
+  List<NandogamiItem> get getTopRated => _topRated;
+  List<NandogamiItem> get getTrending => _trending;
+  List<NandogamiItem> get getSeasonal => _seasonal;
   bool get isLoading => _loading;
   String get query => _query;
+  String? get error => _error;
+  bool get hasError => _error != null;
   Set<String> get favorites => _favoriteIds;
 
   Future<void> init() async {
@@ -32,11 +46,56 @@ class ItemProvider extends ChangeNotifier {
 
   Future<void> load() async {
     _loading = true;
+    _error = null;
     notifyListeners();
+    
     try {
-      _all = await repo.getAll();
-      _rebuildSections();
+      // Get mixed feed from APIs with fallback
+      final mixedFeed = await repo.getMixedFeed();
+      
+      // Convert to NandogamiItems for compatibility
+      _featured = ComicAdapter.toNandogamiItems(mixedFeed['featured'] ?? []);
+      _popular = ComicAdapter.toNandogamiItems(mixedFeed['popular'] ?? []);
+      _newReleases = ComicAdapter.toNandogamiItems(mixedFeed['newReleases'] ?? []);
+      _categoryPicks = ComicAdapter.toNandogamiItems(mixedFeed['categories'] ?? []);
+      _seasonal = ComicAdapter.toNandogamiItems(mixedFeed['seasonal'] ?? []);
+      
+      // Try to load additional sections, but don't fail if they don't work
+      try {
+        await Future.delayed(Duration(milliseconds: 500));
+        _topRated = ComicAdapter.toNandogamiItems(await repo.getTopRated());
+      } catch (e) {
+        print('Failed to load top rated: $e');
+        _topRated = _featured; // Use featured as fallback
+      }
+      
+      try {
+        await Future.delayed(Duration(milliseconds: 500));
+        _trending = ComicAdapter.toNandogamiItems(await repo.getTrending());
+      } catch (e) {
+        print('Failed to load trending: $e');
+        _trending = _featured; // Use featured as fallback
+      }
+      
+      // Build _all from all sections
+      final allComics = <String, NandogamiItem>{};
+      for (final item in [..._featured, ..._popular, ..._newReleases, ..._categoryPicks, ..._seasonal, ..._topRated, ..._trending]) {
+        allComics[item.id] = item;
+      }
+      _all = allComics.values.toList();
+      print('📚 ItemProvider loaded ${_all.length} total comics');
+      print('   Featured: ${_featured.length}');
+      print('   Popular: ${_popular.length}');
+      print('   New Releases: ${_newReleases.length}');
+      print('   Categories: ${_categoryPicks.length}');
+      print('   Seasonal: ${_seasonal.length}');
+      print('   Top Rated: ${_topRated.length}');
+      print('   Trending: ${_trending.length}');
+      
       _applyFilter();
+    } catch (e, stackTrace) {
+      ApiErrorHandler.logError(e, stackTrace);
+      _error = ApiErrorHandler.getErrorMessage(e);
     } finally {
       _loading = false;
       notifyListeners();
@@ -45,8 +104,31 @@ class ItemProvider extends ChangeNotifier {
 
   void search(String q) {
     _query = q;
-    _applyFilter();
+    if (q.isEmpty) {
+      _applyFilter();
+    } else {
+      _searchFromAPI(q);
+    }
     notifyListeners();
+  }
+
+  Future<void> _searchFromAPI(String query) async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    
+    try {
+      final searchResults = await repo.search(query);
+      _filtered = ComicAdapter.toNandogamiItems(searchResults);
+    } catch (e, stackTrace) {
+      ApiErrorHandler.logError(e, stackTrace);
+      // Fallback to local search if API fails
+      _applyFilter();
+      // Don't set error for search failures, just fallback silently
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
   }
 
   void _applyFilter() {
@@ -84,20 +166,50 @@ class ItemProvider extends ChangeNotifier {
 
   bool isFavorite(String id) => _favoriteIds.contains(id);
 
-  List<NandogamiItem> get getFeatured => _featured;
-
-  List<NandogamiItem> get getCategories => _categoryPicks;
-
-  List<NandogamiItem> get getPopular => _popular;
-
-  List<NandogamiItem> get getNewReleases => _newReleases;
-
   NandogamiItem? findById(String id) {
+    print('🔍 ItemProvider.findById called for id: $id');
+    print('   _all length: ${_all.length}');
+    if (_all.isNotEmpty) {
+      print('   First few IDs: ${_all.take(3).map((e) => e.id).toList()}');
+    }
     try {
-      return _all.firstWhere((e) => e.id == id);
+      final item = _all.firstWhere((e) => e.id == id);
+      print('   ✅ Found: ${item.title}');
+      return item;
     } catch (_) {
+      print('   ❌ Not found in _all list');
       return null;
     }
+  }
+
+  /// Find by AniList ID with fallback to API
+  Future<NandogamiItem?> findByIdWithFallback(String id) async {
+    // First try to find in cache
+    final cached = findById(id);
+    if (cached != null) {
+      return cached;
+    }
+
+    // If not found, try to fetch from API
+    print('🔄 Fetching comic $id from API...');
+    try {
+      final anilistId = int.tryParse(id);
+      if (anilistId != null) {
+        final comicItem = await repo.getDetail(anilistId);
+        // Convert ComicItem to NandogamiItem
+        final comic = ComicAdapter.toNandogamiItem(comicItem);
+        // Add to cache for future use
+        _all.add(comic);
+        print('   ✅ Fetched and cached: ${comic.title}');
+        return comic;
+      } else {
+        print('   ❌ Invalid AniList ID: $id');
+      }
+    } catch (e) {
+      print('   ❌ Failed to fetch from API: $e');
+    }
+    
+    return null;
   }
 
   Future<void> _loadFavs() async {
@@ -105,36 +217,44 @@ class ItemProvider extends ChangeNotifier {
     _favoriteIds = (await sp.getStringList('favorites')).toSet();
   }
 
-  void _rebuildSections() {
-    final used = <String>{};
-    List<NandogamiItem> pick(Iterable<NandogamiItem> source, {int take = 8}) {
-      final list = source.toList()..shuffle();
-      final result = <NandogamiItem>[];
-      for (final item in list) {
-        if (used.contains(item.id)) continue;
-        used.add(item.id);
-        result.add(item);
-        if (result.length >= take) break;
+  /// Refresh specific section
+  Future<void> refreshSection(String sectionType) async {
+    try {
+      // Add delay before refresh to avoid rate limiting
+      await Future.delayed(Duration(milliseconds: 1000));
+      
+      switch (sectionType) {
+        case 'trending':
+          _featured = ComicAdapter.toNandogamiItems(await repo.getTrending());
+          break;
+        case 'popular':
+          _popular = ComicAdapter.toNandogamiItems(await repo.getPopular());
+          break;
+        case 'newReleases':
+          _newReleases = ComicAdapter.toNandogamiItems(await repo.getNewReleases());
+          break;
+        case 'topRated':
+          _topRated = ComicAdapter.toNandogamiItems(await repo.getTopRated());
+          break;
+        case 'seasonal':
+          _seasonal = ComicAdapter.toNandogamiItems(await repo.getSeasonal());
+          break;
+        case 'recent':
+          _newReleases = ComicAdapter.toNandogamiItems(await repo.getNewReleases());
+          break;
+        default:
+          // Refresh all sections
+          await load();
+          return;
       }
-      return result;
+      notifyListeners();
+    } catch (e) {
+      ApiErrorHandler.logError(e, StackTrace.current);
+      // Show user-friendly error message
+      _error = 'Failed to refresh data. Please try again later.';
+      notifyListeners();
     }
-
-    _featured = pick(_all.where((e) => e.isFeatured == true));
-    _categoryPicks = pick(
-      _all.where((e) => (e.categories ?? const <String>[]).isNotEmpty),
-    );
-    _popular = pick(_all.where((e) => e.isPopular == true));
-    _newReleases = pick(_all.where((e) => e.isNewRelease == true));
-
-    // If any section empty, fallback to remaining unused items so UI doesn't look blank.
-    void fillIfEmpty(List<NandogamiItem> target) {
-      if (target.isNotEmpty) return;
-      target.addAll(pick(_all.where((e) => !used.contains(e.id))));
-    }
-
-    fillIfEmpty(_featured);
-    fillIfEmpty(_categoryPicks);
-    fillIfEmpty(_popular);
-    fillIfEmpty(_newReleases);
   }
+
+  // Sections are now built directly from API response in load() method
 }
