@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants.dart'; // AppConst, AppColors
-import '../../data/models/comic_item.dart';
+import '../../data/models/nandogami_item.dart';
 import '../../state/item_provider.dart';
 import 'detail_screen.dart';
 
@@ -123,7 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openDetail(BuildContext context, ComicItem it) {
+  void _openDetail(BuildContext context, NandogamiItem it) {
     Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => DetailScreen(item: it)));
@@ -155,8 +155,8 @@ class _SectionTitle extends StatelessWidget {
 /// Memakai kartu khusus `_PosterCard` dengan tinggi tetap dan AspectRatio di dalamnya.
 class _HorizontalStrip extends StatelessWidget {
   final double height;
-  final List<ComicItem> items;
-  final void Function(ComicItem) onTap;
+  final List<NandogamiItem> items;
+  final void Function(NandogamiItem) onTap;
   final bool Function(String id) isFavorite;
   final void Function(String id) onFavTap;
 
@@ -217,7 +217,7 @@ class _HorizontalStrip extends StatelessWidget {
 /// - Gambar pakai AspectRatio(16/9) + overlay teks favorite di dalam,
 ///   tidak ada widget di luar yang menambah tinggi.
 class _PosterCard extends StatelessWidget {
-  final ComicItem item;
+  final NandogamiItem item;
   final VoidCallback onTap;
   final bool isFav;
   final VoidCallback onFavTap;

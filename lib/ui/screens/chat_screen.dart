@@ -2,12 +2,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
+import '../../core/auth_helper.dart';
 import '../../data/models/chat_message.dart';
 import '../../data/models/user_profile.dart';
 import '../../data/services/chat_history_service.dart';
 import '../../data/services/chat_service.dart';
 import '../../data/services/giphy_service.dart';
 import '../../data/services/user_service.dart';
+import 'chat_list_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String peerUserId;
@@ -53,8 +55,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.black,
-        foregroundColor: AppColors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
         title: StreamBuilder<UserProfile?>(
           stream: _userService.watchProfile(widget.peerUserId),
           builder: (context, snapshot) {
@@ -65,16 +67,14 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 CircleAvatar(
                   radius: 18,
-                  backgroundColor: AppColors.purpleAccent.withValues(
-                    alpha: 0.2,
-                  ),
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                   backgroundImage: (photo != null && photo.isNotEmpty)
                       ? NetworkImage(photo)
                       : null,
                   child: (photo == null || photo.isEmpty)
                       ? Text(
                           _initials(name),
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
                         )
                       : null,
                 ),
@@ -91,57 +91,53 @@ class _ChatScreenState extends State<ChatScreen> {
           },
         ),
       ),
-      backgroundColor: AppColors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
-        children: [
-          Expanded(
-            child: uid == null
-                ? const Center(
-                    child: Text(
-                      'Login required',
-                      style: TextStyle(color: AppColors.white),
-                    ),
-                  )
-                : FutureBuilder<String>(
-                    future: _initChat(uid),
-                    builder: (context, snap) {
-                      if (!snap.hasData) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      final cid = snap.data!;
-                      return StreamBuilder<int?>(
-                        stream: _history.watchLastRead(cid, widget.peerUserId),
-                        builder: (context, readSnap) {
-                          final peerLastRead = readSnap.data ?? 0;
+          children: [
+            Expanded(
+              child: uid == null
+                  ? _LoginRequiredWidget()
+                  : FutureBuilder<String>(
+                      future: _initChat(uid),
+                      builder: (context, snap) {
+                        if (!snap.hasData) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        final cid = snap.data!;
+                        return StreamBuilder<int?>(
+                          stream: _history.watchLastRead(cid, widget.peerUserId),
+                          builder: (context, readSnap) {
+                            final peerLastRead = readSnap.data ?? 0;
                           return StreamBuilder<List<ChatMessage>>(
                             stream: _chat.watchMessages(cid),
                             builder: (context, s2) {
                               final msgs = s2.data ?? const [];
-                              // mark read when list updates
+                              // mark read when list updates and show snackbar for new messages
                               WidgetsBinding.instance.addPostFrameCallback((_) {
                                 _history.markReadNow(cid, uid);
-                              });
-                              // in-app popup when new peer message arrives
-                              if (msgs.isNotEmpty) {
-                                final last = msgs.first; // reverse list view
-                                if (last.senderId == widget.peerUserId) {
-                                  final ts = last.createdAt.millisecondsSinceEpoch;
-                                  if (ts > _lastPeerMsgMs) {
-                                    _lastPeerMsgMs = ts;
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          behavior: SnackBarBehavior.floating,
-                                          content: Text(last.text?.trim().isNotEmpty == true
-                                              ? last.text!
-                                              : 'New image'),
-                                          duration: const Duration(seconds: 2),
-                                        ),
-                                      );
+                                
+                                // in-app popup when new peer message arrives
+                                if (msgs.isNotEmpty) {
+                                  final last = msgs.first; // reverse list view
+                                  if (last.senderId == widget.peerUserId) {
+                                    final ts = last.createdAt.millisecondsSinceEpoch;
+                                    if (ts > _lastPeerMsgMs) {
+                                      _lastPeerMsgMs = ts;
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            behavior: SnackBarBehavior.floating,
+                                            content: Text(last.text?.trim().isNotEmpty == true
+                                                ? last.text!
+                                                : 'New image'),
+                                            duration: const Duration(seconds: 2),
+                                          ),
+                                        );
+                                      }
                                     }
                                   }
                                 }
-                              }
+                              });
                               return ListView.builder(
                                 controller: _scrollC,
                                 reverse: true,
@@ -210,7 +206,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     },
                   ),
           ),
-          const Divider(height: 1, color: Color(0xFF22252B)),
+          Divider(height: 1, color: Theme.of(context).dividerTheme.color),
           SafeArea(
             top: false,
             child: Padding(
@@ -219,9 +215,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   IconButton(
                     onPressed: _pickGif,
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.gif_box_outlined,
-                      color: AppColors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   Expanded(
@@ -229,14 +225,14 @@ class _ChatScreenState extends State<ChatScreen> {
                       controller: _messageC,
                       minLines: 1,
                       maxLines: 4,
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                       decoration: InputDecoration(
                         hintText: 'Type a message',
-                        hintStyle: const TextStyle(
-                          color: AppColors.whiteSecondary,
+                        hintStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         filled: true,
-                        fillColor: const Color(0xFF121316),
+                        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 10,
@@ -253,7 +249,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   FilledButton(
                     onPressed: _send,
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.purpleAccent,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                     ),
                     child: const Icon(Icons.send),
                   ),
@@ -266,8 +262,16 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _send() {
+  void _send() async {
     if (_messageC.text.trim().isEmpty) return;
+    
+    // Cek autentikasi dulu
+    final success = await AuthHelper.requireAuthWithDialog(
+      context, 
+      'send a message'
+    );
+    if (!success) return;
+    
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null || _chatId == null) return;
     final senderName =
@@ -289,6 +293,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _pickGif() async {
+    // Cek autentikasi dulu
+    final success = await AuthHelper.requireAuthWithDialog(
+      context, 
+      'send a GIF'
+    );
+    if (!success) return;
+    
     final url = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF0E0F12),
@@ -359,7 +370,16 @@ class _GifPickerState extends State<_GifPicker> {
   @override
   void initState() {
     super.initState();
-    _search();
+    // Cek autentikasi dulu sebelum search
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final success = await AuthHelper.requireAuthWithDialog(
+        context, 
+        'search for GIFs'
+      );
+      if (success) {
+        _search();
+      }
+    });
   }
 
   @override
@@ -385,8 +405,8 @@ class _GifPickerState extends State<_GifPicker> {
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: 'Search GIFs',
-                      hintStyle: const TextStyle(
-                        color: AppColors.whiteSecondary,
+                      hintStyle: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       filled: true,
                       fillColor: const Color(0xFF121316),
@@ -399,12 +419,30 @@ class _GifPickerState extends State<_GifPicker> {
                         borderSide: BorderSide.none,
                       ),
                     ),
-                    onSubmitted: (_) => _search(),
+                    onSubmitted: (_) async {
+                      // Cek autentikasi dulu
+                      final success = await AuthHelper.requireAuthWithDialog(
+                        context, 
+                        'search for GIFs'
+                      );
+                      if (success) {
+                        _search();
+                      }
+                    },
                   ),
                 ),
                 const SizedBox(width: 8),
                 FilledButton(
-                  onPressed: _loading ? null : _search,
+                  onPressed: _loading ? null : () async {
+                    // Cek autentikasi dulu
+                    final success = await AuthHelper.requireAuthWithDialog(
+                      context, 
+                      'search for GIFs'
+                    );
+                    if (success) {
+                      _search();
+                    }
+                  },
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.purpleAccent,
                   ),
@@ -432,7 +470,16 @@ class _GifPickerState extends State<_GifPicker> {
                           ),
                       itemCount: _results.length,
                       itemBuilder: (context, i) => GestureDetector(
-                        onTap: () => Navigator.pop(context, _results[i]),
+                        onTap: () async {
+                          // Cek autentikasi dulu
+                          final success = await AuthHelper.requireAuthWithDialog(
+                            context, 
+                            'send this GIF'
+                          );
+                          if (success) {
+                            Navigator.pop(context, _results[i]);
+                          }
+                        },
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: Image.network(_results[i], fit: BoxFit.cover),
@@ -447,6 +494,13 @@ class _GifPickerState extends State<_GifPicker> {
   }
 
   Future<void> _search() async {
+    // Cek autentikasi dulu
+    final success = await AuthHelper.requireAuthWithDialog(
+      context, 
+      'search for GIFs'
+    );
+    if (!success) return;
+    
     setState(() => _loading = true);
     try {
       final res = await widget.giphy.searchGifs(
@@ -456,5 +510,63 @@ class _GifPickerState extends State<_GifPicker> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+}
+
+class _LoginRequiredWidget extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.chat_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Login Required',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Please login to send and receive messages',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () async {
+                final success = await AuthHelper.requireAuth(context);
+                if (success && context.mounted) {
+                  // Refresh the screen to show chat
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (_) => const ChatListScreen()),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.purpleAccent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Login Now'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

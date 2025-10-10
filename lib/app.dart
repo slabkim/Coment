@@ -1,12 +1,16 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'core/constants.dart';
 import 'core/theme.dart';
+import 'data/models/nandogami_item.dart';
 import 'data/repositories/comic_repository.dart';
-import 'data/services/api_service.dart';
 import 'state/item_provider.dart';
 import 'state/theme_provider.dart';
-import 'ui/screens/home_screen.dart';
+import 'ui/screens/detail_screen.dart';
 import 'ui/screens/main_screen.dart';
 
 class ComentApp extends StatelessWidget {
@@ -16,18 +20,80 @@ class ComentApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (_) => ItemProvider(ComicRepository(ApiService())),
-        ),
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => ItemProvider(ComicRepository())),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()..load()),
       ],
-      child: MaterialApp(
-        title: AppConst.appName,
-        theme: ComentTheme.light,
-        darkTheme: ComentTheme.dark,
-        themeMode: ThemeMode.system,
-        home: const MainScreen(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) => MaterialApp(
+          title: AppConst.appName,
+          theme: ComentTheme.light,
+          darkTheme: ComentTheme.dark,
+          themeMode: themeProvider.mode,
+          home: const _AuthGate(),
+        ),
       ),
     );
+  }
+}
+
+class _AuthGate extends StatefulWidget {
+  const _AuthGate();
+
+  @override
+  State<_AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<_AuthGate> {
+  AppLinks? _appLinks;
+  StreamSubscription<Uri?>? _linkSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDynamicLinks();
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    _appLinks = null;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Langsung ke MainScreen tanpa cek autentikasi
+    return const MainScreen();
+  }
+
+  Future<void> _initDynamicLinks() async {
+    _appLinks = AppLinks();
+    final initial = await _appLinks!.getInitialLink();
+    _handleUri(initial);
+    _linkSubscription = _appLinks!.uriLinkStream.listen(_handleUri);
+  }
+
+  void _handleUri(Uri? deepLink) {
+    if (deepLink == null || !mounted) return;
+    final segments = deepLink.pathSegments;
+    if (segments.length >= 2 && segments.first == 'title') {
+      final id = segments[1];
+      final prov = Provider.of<ItemProvider>(context, listen: false);
+      final item = prov.items.firstWhere(
+        (e) => e.id == id,
+        orElse: () => NandogamiItem(
+          id: id,
+          title: 'Loading...',
+          description: '',
+          imageUrl: '',
+        ),
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => DetailScreen(item: item)));
+      });
+    }
   }
 }
