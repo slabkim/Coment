@@ -70,7 +70,7 @@ class DefaultFirebaseOptions {
     databaseURL:
         'https://nandogami-45016-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'nandogami-45016.firebasestorage.app',
-    iosBundleId: 'com.example.nandogamiFlutter',
+    iosBundleId: 'com.coment',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -81,7 +81,7 @@ class DefaultFirebaseOptions {
     databaseURL:
         'https://nandogami-45016-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'nandogami-45016.firebasestorage.app',
-    iosBundleId: 'com.example.nandogamiFlutter',
+    iosBundleId: 'com.coment',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

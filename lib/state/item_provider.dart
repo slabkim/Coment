@@ -1,20 +1,20 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../data/models/nandogami_item.dart';
-import '../data/repositories/nandogami_repository.dart';
+import '../data/models/comic_item.dart';
+import '../data/repositories/comic_repository.dart';
 
 class ItemProvider extends ChangeNotifier {
-  final NandogamiRepository repo;
+  final ComicRepository repo;
 
   ItemProvider(this.repo);
 
-  List<NandogamiItem> _all = [];
-  List<NandogamiItem> _filtered = [];
+  List<ComicItem> _all = [];
+  List<ComicItem> _filtered = [];
   bool _loading = false;
   String _query = '';
   Set<String> _favoriteIds = {};
 
-  List<NandogamiItem> get items => _filtered;
+  List<ComicItem> get items => _filtered;
   bool get isLoading => _loading;
   String get query => _query;
   Set<String> get favorites => _favoriteIds;
@@ -70,16 +70,22 @@ class ItemProvider extends ChangeNotifier {
 
   bool isFavorite(String id) => _favoriteIds.contains(id);
 
-  List<NandogamiItem> get getFeatured =>
-      _all.sublist(0, _all.length.clamp(0, 5));
+  ComicItem? findById(String id) {
+    try {
+      return _all.firstWhere((e) => e.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
 
-  List<NandogamiItem> get getCategories =>
+  List<ComicItem> get getFeatured => _all.sublist(0, _all.length.clamp(0, 5));
+
+  List<ComicItem> get getCategories =>
       _all.sublist(5, _all.length.clamp(5, 10));
 
-  List<NandogamiItem> get getPopular =>
-      _all.sublist(10, _all.length.clamp(10, 15));
+  List<ComicItem> get getPopular => _all.sublist(10, _all.length.clamp(10, 15));
 
-  List<NandogamiItem> get getNewReleases =>
+  List<ComicItem> get getNewReleases =>
       _all.sublist(15, _all.length.clamp(15, 20));
 
   Future<void> _loadFavs() async {

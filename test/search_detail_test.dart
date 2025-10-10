@@ -2,27 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
-import 'package:nandogami_flutter/state/item_provider.dart';
-import 'package:nandogami_flutter/data/repositories/nandogami_repository.dart';
-import 'package:nandogami_flutter/data/models/nandogami_item.dart';
-import 'package:nandogami_flutter/ui/screens/search_screen.dart';
-import 'package:nandogami_flutter/ui/screens/detail_screen.dart';
-import 'package:nandogami_flutter/data/services/api_service.dart';
+import 'package:coment/state/item_provider.dart';
+import 'package:coment/data/repositories/comic_repository.dart';
+import 'package:coment/data/models/comic_item.dart';
+import 'package:coment/ui/screens/search_screen.dart';
+import 'package:coment/ui/screens/detail_screen.dart';
+import 'package:coment/data/services/api_service.dart';
 
-class _TestRepo extends NandogamiRepository {
+class _TestRepo extends ComicRepository {
   _TestRepo() : super(ApiService());
 
   @override
-  Future<List<NandogamiItem>> getAll() async {
+  Future<List<ComicItem>> getAll() async {
     return [
-      NandogamiItem(
+      ComicItem(
         id: '1',
         title: 'Attack on Titan',
         description: 'Shingeki no Kyojin',
         imageUrl: 'https://example.com/aot.jpg',
         categories: const ['Action', 'Drama'],
       ),
-      NandogamiItem(
+      ComicItem(
         id: '2',
         title: 'One Piece',
         description: 'Pirates adventure',
@@ -64,5 +64,3 @@ void main() {
     expect(find.byType(DetailScreen), findsOneWidget);
   });
 }
-
-

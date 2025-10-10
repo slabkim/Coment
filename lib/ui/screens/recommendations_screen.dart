@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants.dart';
-import '../../data/models/nandogami_item.dart';
+import '../../data/models/comic_item.dart';
 import '../../data/services/favorite_service.dart';
 import '../../state/item_provider.dart';
 import 'detail_screen.dart';
@@ -30,23 +30,27 @@ class RecommendationsScreen extends StatelessWidget {
       backgroundColor: AppColors.black,
       body: uid == null
           ? const Center(
-              child: Text('Login required', style: TextStyle(color: AppColors.white)),
+              child: Text(
+                'Login required',
+                style: TextStyle(color: AppColors.white),
+              ),
             )
-          : StreamBuilder<List<String>>( 
+          : StreamBuilder<List<String>>(
               stream: favs.watchFavorites(uid),
               builder: (context, snap) {
                 final myFavIds = snap.data ?? const <String>[];
                 // naive recs: pick items that share categories with my favorites
                 final myFavItems = myFavIds
                     .map((id) => prov.findById(id))
-                    .whereType<NandogamiItem>()
+                    .whereType<ComicItem>()
                     .toList();
                 final myCats = <String>{
                   for (final it in myFavItems)
-                    ...((it.categories ?? const <String>[]))
+                    ...((it.categories ?? const <String>[])),
                 };
                 final candidates = prov.items.where((e) {
-                  if (myFavIds.contains(e.id)) return false; // exclude already fav
+                  if (myFavIds.contains(e.id))
+                    return false; // exclude already fav
                   final cats = e.categories ?? const <String>[];
                   return cats.any((c) => myCats.contains(c));
                 }).toList();
@@ -87,7 +91,9 @@ class RecommendationsScreen extends StatelessWidget {
                           (it.categories ?? const []).join(', '),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: AppColors.whiteSecondary),
+                          style: const TextStyle(
+                            color: AppColors.whiteSecondary,
+                          ),
                         ),
                         trailing: const Icon(
                           Icons.chevron_right,
@@ -95,7 +101,9 @@ class RecommendationsScreen extends StatelessWidget {
                         ),
                         onTap: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => DetailScreen(item: it)),
+                            MaterialPageRoute(
+                              builder: (_) => DetailScreen(item: it),
+                            ),
                           );
                         },
                       ),

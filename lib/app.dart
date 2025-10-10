@@ -1,34 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/constants.dart';
-import 'data/repositories/nandogami_repository.dart';
+import 'core/theme.dart';
+import 'data/repositories/comic_repository.dart';
 import 'data/services/api_service.dart';
 import 'state/item_provider.dart';
+import 'state/theme_provider.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/screens/main_screen.dart';
 
-class NandogamiApp extends StatelessWidget {
-  const NandogamiApp({super.key});
+class ComentApp extends StatelessWidget {
+  const ComentApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => ItemProvider(NandogamiRepository(ApiService())),
+          create: (_) => ItemProvider(ComicRepository(ApiService())),
         ),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
       child: MaterialApp(
         title: AppConst.appName,
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.dark(
-            primary: AppColors.primaryDark,
-            surface: AppColors.black,
-            onSurface: AppColors.white,
-          ),
-          scaffoldBackgroundColor: AppColors.black,
-        ),
+        theme: ComentTheme.light,
+        darkTheme: ComentTheme.dark,
+        themeMode: ThemeMode.system,
         home: const MainScreen(),
       ),
     );

@@ -1,14 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/nandogami_item.dart';
+import '../models/comic_item.dart';
 
 class ApiService {
-  Future<List<NandogamiItem>> fetchItems() async {
+  Future<List<ComicItem>> fetchItems() async {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('titles')
           .get();
       return snapshot.docs
-          .map((doc) => NandogamiItem.fromJson(doc.data(), doc.id))
+          .map((doc) => ComicItem.fromJson(doc.data(), doc.id))
           .toList();
     } catch (e) {
       throw Exception('Failed to fetch items: $e');

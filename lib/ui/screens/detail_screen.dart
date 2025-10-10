@@ -2,12 +2,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../data/models/nandogami_item.dart';
+import '../../data/models/comic_item.dart';
 import '../../state/item_provider.dart';
 import '../../core/constants.dart'; // pastikan punya AppColors & AppConst
 
 class DetailScreen extends StatelessWidget {
-  final NandogamiItem item;
+  final ComicItem item;
   const DetailScreen({super.key, required this.item});
 
   @override

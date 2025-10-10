@@ -1,4 +1,4 @@
-package com.example.nandogami
+package com.coment
 
 import io.flutter.embedding.android.FlutterActivity
 

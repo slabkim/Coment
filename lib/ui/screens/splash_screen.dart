@@ -109,6 +109,6 @@ class _RootGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const NandogamiApp();
+    return const ComentApp();
   }
 }

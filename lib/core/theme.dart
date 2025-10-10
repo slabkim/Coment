@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'constants.dart';
 
 /// Centralized app theme and design tokens.
-class NandogamiTheme {
-  const NandogamiTheme._();
+class ComentTheme {
+  const ComentTheme._();
 
   static ThemeData get dark {
     return ThemeData(
@@ -14,13 +14,10 @@ class NandogamiTheme {
         surface: AppColors.blackSurface,
         onSurface: AppColors.white,
         secondary: AppColors.purple500,
-        background: AppColors.black,
-        onBackground: AppColors.white,
+        onSurfaceVariant: AppColors.white,
       ),
       scaffoldBackgroundColor: AppColors.black,
-      textTheme: const TextTheme(
-        bodyMedium: TextStyle(color: AppColors.white),
-      ),
+      textTheme: const TextTheme(bodyMedium: TextStyle(color: AppColors.white)),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.blackLight,
@@ -63,9 +60,7 @@ class NandogamiTheme {
         onBackground: Colors.black,
       ),
       scaffoldBackgroundColor: Colors.white,
-      textTheme: const TextTheme(
-        bodyMedium: TextStyle(color: Colors.black87),
-      ),
+      textTheme: const TextTheme(bodyMedium: TextStyle(color: Colors.black87)),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: const Color(0xFFF2F3F5),
@@ -101,5 +96,3 @@ class AppDimens {
   static const double chipRadius = 12;
   static const double fieldRadius = 10;
 }
-
-

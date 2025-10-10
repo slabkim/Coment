@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants.dart';
 import '../../data/services/reading_status_service.dart';
 import '../../state/item_provider.dart';
-import '../../data/models/nandogami_item.dart';
+import '../../data/models/comic_item.dart';
 import 'detail_screen.dart';
 
 class ReadingListScreen extends StatelessWidget {
@@ -67,7 +67,7 @@ class _StatusList extends StatelessWidget {
         }
         final items = ids
             .map((id) => prov.findById(id))
-            .whereType<NandogamiItem>()
+            .whereType<ComicItem>()
             .toList();
         if (items.isEmpty) {
           return const Center(

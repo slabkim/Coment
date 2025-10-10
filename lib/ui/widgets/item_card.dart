@@ -1,9 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import '../../data/models/nandogami_item.dart';
+import '../../data/models/comic_item.dart';
 
 class ItemCard extends StatelessWidget {
-  final NandogamiItem item;
+  final ComicItem item;
   final VoidCallback onTap;
   final bool isFavorite;
   final VoidCallback onFavTap;

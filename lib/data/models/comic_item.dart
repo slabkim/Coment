@@ -1,4 +1,4 @@
-class NandogamiItem {
+class ComicItem {
   final String id;
   final String title;
   final String description;
@@ -18,7 +18,7 @@ class NandogamiItem {
   final List<String>? themes;
   final String? type;
 
-  const NandogamiItem({
+  const ComicItem({
     required this.id,
     required this.title,
     required this.description,
@@ -39,8 +39,8 @@ class NandogamiItem {
     this.type,
   });
 
-  factory NandogamiItem.fromJson(Map<String, dynamic> j, [String? docId]) =>
-      NandogamiItem(
+  factory ComicItem.fromJson(Map<String, dynamic> j, [String? docId]) =>
+      ComicItem(
         id: docId ?? j['id'].toString(),
         title: j['title'] ?? '',
         description: j['description'] ?? '',
