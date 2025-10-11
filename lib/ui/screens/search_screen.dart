@@ -46,24 +46,9 @@ class _SearchScreenState extends State<SearchScreen> {
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
-        titleSpacing: 0,
-        leading: Container(
-          margin: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outline,
-              width: 1,
-            ),
-          ),
-          child: IconButton(
-            icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
+        centerTitle: true,
         title: Container(
-          margin: const EdgeInsets.only(right: 16),
+          margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(16),
@@ -77,7 +62,9 @@ class _SearchScreenState extends State<SearchScreen> {
             style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
             decoration: InputDecoration(
               hintText: 'Search manga, authors, genres...',
-              hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              hintStyle: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -124,8 +111,8 @@ class _SearchScreenState extends State<SearchScreen> {
               },
             )
           : (_c.text.trim().startsWith('@')
-              ? _UserResults(_c.text.trim().substring(1))
-              : _SearchResults()),
+                ? _UserResults(_c.text.trim().substring(1))
+                : _SearchResults()),
     );
   }
 }
@@ -159,8 +146,12 @@ class _RecentAndSuggestions extends StatelessWidget {
                   (e) => ActionChip(
                     label: Text(e),
                     onPressed: () => onTap(e),
-                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    labelStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    labelStyle: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
                 )
                 .toList(),
@@ -196,7 +187,9 @@ class _RecentAndSuggestions extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            shadows: [Shadow(blurRadius: 4, color: Colors.black87)],
+                            shadows: [
+                              Shadow(blurRadius: 4, color: Colors.black87),
+                            ],
                           ),
                         ),
                       ),
@@ -210,7 +203,9 @@ class _RecentAndSuggestions extends StatelessWidget {
         const SizedBox(height: 16),
         Text(
           'Popular tags',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -287,9 +282,9 @@ class _SearchResults extends StatelessWidget {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => DetailScreen(item: it)),
-            );
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => DetailScreen(item: it)));
           },
         );
       },
@@ -311,7 +306,10 @@ class _UserResults extends StatelessWidget {
         final users = snapshot.data ?? const [];
         if (users.isEmpty) {
           return Center(
-            child: Text('No users found', style: Theme.of(context).textTheme.bodyMedium),
+            child: Text(
+              'No users found',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           );
         }
         return ListView.separated(
@@ -329,15 +327,18 @@ class _UserResults extends StatelessWidget {
                     ? const Icon(Icons.person)
                     : null,
               ),
-              title: Text(u.username ?? u.handle ?? 'User', style: Theme.of(context).textTheme.bodyLarge),
+              title: Text(
+                u.username ?? u.handle ?? 'User',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
               subtitle: Text(
                 (u.handle ?? u.email ?? ''),
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               onTap: () async {
                 final success = await AuthHelper.requireAuthWithDialog(
-                  context, 
-                  'view user profile'
+                  context,
+                  'view user profile',
                 );
                 if (success) {
                   Navigator.of(context).push(
