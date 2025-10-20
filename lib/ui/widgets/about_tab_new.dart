@@ -499,7 +499,6 @@ class _AboutTabNewState extends State<AboutTabNew> {
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 4,
-                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
@@ -517,7 +516,6 @@ class _AboutTabNewState extends State<AboutTabNew> {
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.3),
                             blurRadius: 4,
-                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),

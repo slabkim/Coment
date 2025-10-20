@@ -19,10 +19,18 @@ class ChatHistoryService {
 
   Future<void> markReadNow(String chatId, String userId) async {
     final id = _docId(chatId, userId);
-    await _db.collection('chat_history').doc(id).set({
-      'chatId': chatId,
-      'userId': userId,
-      'lastReadAt': DateTime.now().millisecondsSinceEpoch,
-    }, SetOptions(merge: true));
+    try {
+      await _db.collection('chat_history').doc(id).set({
+        'chatId': chatId,
+        'userId': userId,
+        'lastReadAt': DateTime.now().millisecondsSinceEpoch,
+      }, SetOptions(merge: true));
+    } on FirebaseException catch (e) {
+      // Swallow permission-denied errors; user might not have rights
+      // (e.g., signed out or rules mismatch). Avoid crashing/UI noise.
+      if (e.code != 'permission-denied') {
+        rethrow;
+      }
+    }
   }
 }

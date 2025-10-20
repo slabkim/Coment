@@ -52,7 +52,6 @@ class ModernMangaCard extends StatelessWidget {
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.3),
                   blurRadius: 8,
-                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -65,10 +64,7 @@ class ModernMangaCard extends StatelessWidget {
                   child: Stack(
                     children: [
                       ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          topRight: Radius.circular(16),
-                        ),
+                        borderRadius: BorderRadius.circular(16),
                         child: CachedNetworkImage(
                           imageUrl: item.imageUrl,
                           fit: BoxFit.cover,

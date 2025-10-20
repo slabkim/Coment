@@ -297,7 +297,7 @@ void _showThemeSheet(BuildContext context) {
     context: context,
     backgroundColor: Theme.of(context).colorScheme.surface,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: BorderRadius.all(Radius.circular(16)),
     ),
     builder: (_) => const _ThemeSheet(),
   );

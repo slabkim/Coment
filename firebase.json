@@ -1,29 +1,32 @@
 {
-  "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  },
-  "flutter": {
-    "platforms": {
-      "android": {
-        "default": {
-          "projectId": "nandogami-45016",
-          "appId": "1:190535714842:android:3ec9b1b47eea08837be9a3",
-          "fileOutput": "android/app/google-services.json"
+    "firestore": {
+        "rules": "firestore.rules",
+        "indexes": "firestore.indexes.json"
+    },
+    "functions": {
+        "source": "functions"
+    },
+    "flutter": {
+        "platforms": {
+            "android": {
+                "default": {
+                    "projectId": "nandogami-45016",
+                    "appId": "1:190535714842:android:3ec9b1b47eea08837be9a3",
+                    "fileOutput": "android/app/google-services.json"
+                }
+            },
+            "dart": {
+                "lib/firebase_options.dart": {
+                    "projectId": "nandogami-45016",
+                    "configurations": {
+                        "android": "1:190535714842:android:3ec9b1b47eea08837be9a3",
+                        "ios": "1:190535714842:ios:984b6dbf8236a9bb7be9a3",
+                        "macos": "1:190535714842:ios:984b6dbf8236a9bb7be9a3",
+                        "web": "1:190535714842:web:6cdcc9a5522a3b447be9a3",
+                        "windows": "1:190535714842:web:05ed73edd1b5444f7be9a3"
+                    }
+                }
+            }
         }
-      },
-      "dart": {
-        "lib/firebase_options.dart": {
-          "projectId": "nandogami-45016",
-          "configurations": {
-            "android": "1:190535714842:android:3ec9b1b47eea08837be9a3",
-            "ios": "1:190535714842:ios:984b6dbf8236a9bb7be9a3",
-            "macos": "1:190535714842:ios:984b6dbf8236a9bb7be9a3",
-            "web": "1:190535714842:web:6cdcc9a5522a3b447be9a3",
-            "windows": "1:190535714842:web:05ed73edd1b5444f7be9a3"
-          }
-        }
-      }
     }
-  }
 }

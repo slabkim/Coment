@@ -27,7 +27,6 @@ class ModernBottomNavBar extends StatelessWidget {
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 20,
-            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -104,7 +103,6 @@ class ModernBottomNavBar extends StatelessWidget {
                             BoxShadow(
                               color: AppColors.purplePrimary.withValues(alpha: 0.4),
                               blurRadius: 8,
-                              offset: const Offset(0, 2),
                             ),
                           ],
                         )

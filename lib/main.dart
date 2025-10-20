@@ -12,6 +12,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
+import 'notifications/notification_service.dart';
+import 'ui/screens/chat_screen.dart';
 
 import 'core/constants.dart';
 import 'core/theme.dart';
@@ -23,6 +25,7 @@ import 'ui/screens/chat_list_screen.dart';
 import 'ui/screens/splash_screen.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+RemoteMessage? _pendingInitialMessage;
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -37,6 +40,15 @@ Future<void> _configureMessaging() async {
   if (token != null && user != null) {
     await _persistUserFcmToken(user.uid, token);
   }
+  // Persist token when user logs in after app start
+  FirebaseAuth.instance.authStateChanges().listen((u) async {
+    if (u != null) {
+      final t = await _getFcmToken(fcm);
+      if (t != null) {
+        await _persistUserFcmToken(u.uid, t);
+      }
+    }
+  });
   FirebaseMessaging.instance.onTokenRefresh.listen(
     (newToken) async {
       final refreshedUser = FirebaseAuth.instance.currentUser;
@@ -52,38 +64,50 @@ Future<void> _configureMessaging() async {
   // Background handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // Foreground message: show lightweight snackbar banner
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    final ctx = appNavigatorKey.currentContext;
-    if (ctx == null) return;
-    final title = message.notification?.title ?? 'New notification';
-    final body = message.notification?.body ?? '';
-
-    // Use post-frame callback to avoid calling showSnackBar during build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final text = [title, body].where((e) => e.isNotEmpty).join(' - ');
-      if (text.isEmpty) return;
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(text),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    });
+  // Foreground message: show local notification
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+    await AppNotificationService.instance.showForegroundRemote(message);
   });
 
   // Notification opened
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-    final ctx = appNavigatorKey.currentContext;
-    if (ctx == null) return;
-    final type = message.data['type'];
-    if (type == 'dm') {
-      Navigator.of(
-        ctx,
-      ).push(MaterialPageRoute(builder: (_) => const ChatListScreen()));
-    }
+    _handleMessageNavigation(message, initial: false);
   });
+
+  // App launched from terminated by tapping notification
+  try {
+    final initial = await FirebaseMessaging.instance.getInitialMessage();
+    if (initial != null) {
+      _pendingInitialMessage = initial;
+    }
+  } catch (_) {}
+}
+
+Future<void> _handleMessageNavigation(RemoteMessage message, {required bool initial}) async {
+  final type = message.data['type'];
+  if (type != 'dm') return;
+
+  final senderId = message.data['senderId'];
+  final chatId = message.data['chatId']; // may be unused here
+  if (senderId == null || senderId.toString().isEmpty) return;
+  final senderName = (message.data['senderName'] as String?)
+      ?? message.notification?.title
+      ?? 'Someone';
+
+  final navigator = appNavigatorKey.currentState;
+  if (navigator == null) {
+    // If navigator isn't ready yet, queue it
+    _pendingInitialMessage = message;
+    return;
+  }
+  navigator.push(
+    MaterialPageRoute(
+      builder: (_) => ChatScreen(
+        peerUserId: senderId,
+        peerDisplayName: senderName,
+      ),
+    ),
+  );
 }
 
 Future<String?> _getFcmToken(FirebaseMessaging messaging) async {
@@ -100,6 +124,7 @@ Future<void> _persistUserFcmToken(String uid, String token) async {
   try {
     await FirebaseFirestore.instance.collection('users').doc(uid).set({
       'fcmToken': token,
+      'fcmTokens': FieldValue.arrayUnion([token]),
       'fcmUpdatedAt': DateTime.now().millisecondsSinceEpoch,
     }, SetOptions(merge: true));
   } on FirebaseException catch (error, stackTrace) {
@@ -251,7 +276,23 @@ Future<void> main() async {
     await _handleAuthTokenFailure(error, stackTrace: stackTrace);
   }
 
+  // Initialize local notifications (channel, etc.)
+  try {
+    await AppNotificationService.instance.initialize();
+  } catch (e) {
+    debugPrint('Local notifications init failed: $e');
+  }
+
   runApp(const NandogamiBootstrap());
+
+  // Handle any pending initial notification tap after app mount
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final msg = _pendingInitialMessage;
+    if (msg != null) {
+      _pendingInitialMessage = null;
+      _handleMessageNavigation(msg, initial: true);
+    }
+  });
 }
 
 class NandogamiBootstrap extends StatelessWidget {

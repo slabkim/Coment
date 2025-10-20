@@ -67,14 +67,20 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 CircleAvatar(
                   radius: 18,
-                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer,
                   backgroundImage: (photo != null && photo.isNotEmpty)
                       ? NetworkImage(photo)
                       : null,
                   child: (photo == null || photo.isEmpty)
                       ? Text(
                           _initials(name),
-                          style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onPrimaryContainer,
+                          ),
                         )
                       : null,
                 ),
@@ -93,21 +99,21 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
-          children: [
-            Expanded(
-              child: uid == null
-                  ? _LoginRequiredWidget()
-                  : FutureBuilder<String>(
-                      future: _initChat(uid),
-                      builder: (context, snap) {
-                        if (!snap.hasData) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                        final cid = snap.data!;
-                        return StreamBuilder<int?>(
-                          stream: _history.watchLastRead(cid, widget.peerUserId),
-                          builder: (context, readSnap) {
-                            final peerLastRead = readSnap.data ?? 0;
+        children: [
+          Expanded(
+            child: uid == null
+                ? _LoginRequiredWidget()
+                : FutureBuilder<String>(
+                    future: _initChat(uid),
+                    builder: (context, snap) {
+                      if (!snap.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      final cid = snap.data!;
+                      return StreamBuilder<int?>(
+                        stream: _history.watchLastRead(cid, widget.peerUserId),
+                        builder: (context, readSnap) {
+                          final peerLastRead = readSnap.data ?? 0;
                           return StreamBuilder<List<ChatMessage>>(
                             stream: _chat.watchMessages(cid),
                             builder: (context, s2) {
@@ -115,28 +121,8 @@ class _ChatScreenState extends State<ChatScreen> {
                               // mark read when list updates and show snackbar for new messages
                               WidgetsBinding.instance.addPostFrameCallback((_) {
                                 _history.markReadNow(cid, uid);
-                                
+
                                 // in-app popup when new peer message arrives
-                                if (msgs.isNotEmpty) {
-                                  final last = msgs.first; // reverse list view
-                                  if (last.senderId == widget.peerUserId) {
-                                    final ts = last.createdAt.millisecondsSinceEpoch;
-                                    if (ts > _lastPeerMsgMs) {
-                                      _lastPeerMsgMs = ts;
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            behavior: SnackBarBehavior.floating,
-                                            content: Text(last.text?.trim().isNotEmpty == true
-                                                ? last.text!
-                                                : 'New image'),
-                                            duration: const Duration(seconds: 2),
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  }
-                                }
                               });
                               return ListView.builder(
                                 controller: _scrollC,
@@ -150,44 +136,74 @@ class _ChatScreenState extends State<ChatScreen> {
                                   final m = msgs[i];
                                   final isMe = m.senderId == uid;
                                   final content =
-                                      m.imageUrl != null && m.imageUrl!.isNotEmpty
+                                      m.imageUrl != null &&
+                                          m.imageUrl!.isNotEmpty
                                       ? Image.network(m.imageUrl!, width: 180)
                                       : Text(
                                           m.text ?? '',
+                                          softWrap: true,
+                                          overflow: TextOverflow.clip,
+                                          // Allow wrapping onto multiple lines.
+                                          maxLines: null,
                                           style: const TextStyle(
                                             color: Colors.white,
                                           ),
                                         );
-                                  final isRead = isMe && (m.createdAt.millisecondsSinceEpoch <= peerLastRead);
+                                  final isRead =
+                                      isMe &&
+                                      (m.createdAt.millisecondsSinceEpoch <=
+                                          peerLastRead);
                                   return Align(
                                     alignment: isMe
                                         ? Alignment.centerRight
                                         : Alignment.centerLeft,
                                     child: Row(
+                                      // Keep row compact but make sure the bubble
+                                      // doesn't exceed available width
                                       mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
                                       children: [
-                                        if (!isMe) const SizedBox(width: 0) else const SizedBox(width: 0),
-                                        Container(
-                                          margin: const EdgeInsets.symmetric(
-                                            vertical: 4,
+                                        if (!isMe)
+                                          const SizedBox(width: 0)
+                                        else
+                                          const SizedBox(width: 0),
+                                        // Constrain the bubble max width so long
+                                        // texts wrap and do not overflow with the
+                                        // trailing status icon.
+                                        Flexible(
+                                          child: ConstrainedBox(
+                                            constraints: BoxConstraints(
+                                              // Keep an upper bound for very wide screens,
+                                              // but allow the bubble to shrink as needed.
+                                              maxWidth: MediaQuery.of(context).size.width * 0.72,
+                                            ),
+                                            child: Container(
+                                              margin: const EdgeInsets.symmetric(
+                                                vertical: 4,
+                                              ),
+                                              padding: const EdgeInsets.symmetric(
+                                                vertical: 8,
+                                                horizontal: 12,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: isMe
+                                                    ? const Color(0xFF3B2A58)
+                                                    : const Color(0xFF1E232B),
+                                                borderRadius: BorderRadius.circular(
+                                                  12,
+                                                ),
+                                              ),
+                                              child: content,
+                                            ),
                                           ),
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                            horizontal: 12,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: isMe
-                                                ? const Color(0xFF3B2A58)
-                                                : const Color(0xFF1E232B),
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: content,
                                         ),
                                         if (isMe) ...[
                                           const SizedBox(width: 6),
                                           Icon(
-                                            isRead ? Icons.done_all : Icons.check,
+                                            isRead
+                                                ? Icons.done_all
+                                                : Icons.check,
                                             size: 16,
                                             color: isRead
                                                 ? Colors.lightBlueAccent
@@ -225,14 +241,18 @@ class _ChatScreenState extends State<ChatScreen> {
                       controller: _messageC,
                       minLines: 1,
                       maxLines: 4,
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Type a message',
                         hintStyle: TextStyle(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                         filled: true,
-                        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        fillColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 10,
@@ -264,14 +284,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _send() async {
     if (_messageC.text.trim().isEmpty) return;
-    
+
     // Cek autentikasi dulu
     final success = await AuthHelper.requireAuthWithDialog(
-      context, 
-      'send a message'
+      context,
+      'send a message',
     );
     if (!success) return;
-    
+
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null || _chatId == null) return;
     final senderName =
@@ -295,16 +315,16 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _pickGif() async {
     // Cek autentikasi dulu
     final success = await AuthHelper.requireAuthWithDialog(
-      context, 
-      'send a GIF'
+      context,
+      'send a GIF',
     );
     if (!success) return;
-    
+
     final url = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF0E0F12),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.all(Radius.circular(16)),
       ),
       builder: (_) => _GifPicker(giphy: _giphy),
     );
@@ -373,8 +393,8 @@ class _GifPickerState extends State<_GifPicker> {
     // Cek autentikasi dulu sebelum search
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final success = await AuthHelper.requireAuthWithDialog(
-        context, 
-        'search for GIFs'
+        context,
+        'search for GIFs',
       );
       if (success) {
         _search();
@@ -422,8 +442,8 @@ class _GifPickerState extends State<_GifPicker> {
                     onSubmitted: (_) async {
                       // Cek autentikasi dulu
                       final success = await AuthHelper.requireAuthWithDialog(
-                        context, 
-                        'search for GIFs'
+                        context,
+                        'search for GIFs',
                       );
                       if (success) {
                         _search();
@@ -433,16 +453,19 @@ class _GifPickerState extends State<_GifPicker> {
                 ),
                 const SizedBox(width: 8),
                 FilledButton(
-                  onPressed: _loading ? null : () async {
-                    // Cek autentikasi dulu
-                    final success = await AuthHelper.requireAuthWithDialog(
-                      context, 
-                      'search for GIFs'
-                    );
-                    if (success) {
-                      _search();
-                    }
-                  },
+                  onPressed: _loading
+                      ? null
+                      : () async {
+                          // Cek autentikasi dulu
+                          final success =
+                              await AuthHelper.requireAuthWithDialog(
+                                context,
+                                'search for GIFs',
+                              );
+                          if (success) {
+                            _search();
+                          }
+                        },
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.purpleAccent,
                   ),
@@ -472,10 +495,11 @@ class _GifPickerState extends State<_GifPicker> {
                       itemBuilder: (context, i) => GestureDetector(
                         onTap: () async {
                           // Cek autentikasi dulu
-                          final success = await AuthHelper.requireAuthWithDialog(
-                            context, 
-                            'send this GIF'
-                          );
+                          final success =
+                              await AuthHelper.requireAuthWithDialog(
+                                context,
+                                'send this GIF',
+                              );
                           if (success) {
                             Navigator.pop(context, _results[i]);
                           }
@@ -496,11 +520,11 @@ class _GifPickerState extends State<_GifPicker> {
   Future<void> _search() async {
     // Cek autentikasi dulu
     final success = await AuthHelper.requireAuthWithDialog(
-      context, 
-      'search for GIFs'
+      context,
+      'search for GIFs',
     );
     if (!success) return;
-    
+
     setState(() => _loading = true);
     try {
       final res = await widget.giphy.searchGifs(
@@ -539,9 +563,9 @@ class _LoginRequiredWidget extends StatelessWidget {
             Text(
               'Please login to send and receive messages',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontSize: 16,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 16),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
@@ -557,7 +581,10 @@ class _LoginRequiredWidget extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.purpleAccent,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),

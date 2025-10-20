@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:app_links/app_links.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -11,7 +10,6 @@ import 'data/repositories/comic_repository.dart';
 import 'state/item_provider.dart';
 import 'state/theme_provider.dart';
 import 'ui/screens/detail_screen.dart';
-import 'ui/screens/login_register_screen.dart';
 import 'ui/screens/main_screen.dart';
 import 'core/theme.dart';
 
