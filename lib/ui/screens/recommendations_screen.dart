@@ -112,7 +112,7 @@ class RecommendationsScreen extends StatelessWidget {
       context: context,
       backgroundColor: const Color(0xFF0E0F12),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.all(Radius.circular(16)),
       ),
       builder: (_) => const _UserSelectorSheet(),
     );

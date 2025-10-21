@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "staging": "nandogami-45016",
+    "default": "nandogami-45016"
+  },
+  "targets": {},
+  "etags": {}
+}

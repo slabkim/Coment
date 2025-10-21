@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
-import 'package:coment/ui/screens/splash_screen.dart';
+import 'package:nandogami_flutter/ui/screens/splash_screen.dart';
 
 void main() {
   testWidgets('App boots splash', (tester) async {

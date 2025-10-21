@@ -147,18 +147,18 @@ class HomeLoadingGrid extends StatelessWidget {
               itemBuilder: (context, index) {
                 return Container(
                   margin: const EdgeInsets.only(right: 12),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                       ShimmerCard(
                         width: 140,
                         height: 180,
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      SizedBox(height: 8),
-                      ShimmerCard(width: 140, height: 16),
-                      SizedBox(height: 4),
-                      ShimmerCard(width: 100, height: 12),
+                        SizedBox(height: 8),
+                        ShimmerCard(width: 140, height: 16),
+                        SizedBox(height: 4),
+                        ShimmerCard(width: 100, height: 12),
                     ],
                   ),
                 );
@@ -180,18 +180,18 @@ class HomeLoadingGrid extends StatelessWidget {
               itemBuilder: (context, index) {
                 return Container(
                   margin: const EdgeInsets.only(right: 12),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                       ShimmerCard(
                         width: 120,
                         height: 140,
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      SizedBox(height: 8),
-                      ShimmerCard(width: 120, height: 14),
-                    ],
-                  ),
+                        SizedBox(height: 8),
+                        ShimmerCard(width: 120, height: 14),
+                      ],
+                    ),
                 );
               },
             ),

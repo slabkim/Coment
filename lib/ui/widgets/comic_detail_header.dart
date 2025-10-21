@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/constants.dart';
@@ -28,15 +27,11 @@ class ComicDetailHeader extends StatelessWidget {
     return Container(
       height: 280, // Reduced height for better proportions
       decoration: BoxDecoration(
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 20,
-            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -46,36 +41,30 @@ class ComicDetailHeader extends StatelessWidget {
           // Background Image with Blur (using bannerImage)
           Positioned.fill(
             child: ClipRRect(
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(24),
-                bottomRight: Radius.circular(24),
-              ),
-              child: ImageFiltered(
-                imageFilter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-                child: CachedNetworkImage(
-                  imageUrl: (item.bannerImage != null && item.bannerImage!.isNotEmpty) 
-                      ? item.bannerImage! 
-                      : item.coverImage ?? item.imageUrl,
-                  fit: BoxFit.cover,
-                  alignment: (item.bannerImage != null && item.bannerImage!.isNotEmpty) 
-                      ? Alignment.topCenter 
-                      : Alignment.center,
-                  placeholder: (context, url) => Container(
-                    color: AppColors.grayDark,
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.purpleAccent,
-                      ),
+              borderRadius: BorderRadius.circular(24),
+              child: CachedNetworkImage(
+                imageUrl: (item.bannerImage != null && item.bannerImage!.isNotEmpty) 
+                    ? item.bannerImage! 
+                    : item.coverImage ?? item.imageUrl,
+                fit: BoxFit.cover,
+                alignment: (item.bannerImage != null && item.bannerImage!.isNotEmpty) 
+                    ? Alignment.topCenter 
+                    : Alignment.center,
+                placeholder: (context, url) => Container(
+                  color: AppColors.grayDark,
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.purpleAccent,
                     ),
                   ),
-                  errorWidget: (context, url, error) => Container(
-                    color: AppColors.grayDark,
-                    child: const Center(
-                      child: Icon(
-                        Icons.broken_image,
-                        color: AppColors.whiteSecondary,
-                        size: 48,
-                      ),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  color: AppColors.grayDark,
+                  child: const Center(
+                    child: Icon(
+                      Icons.broken_image,
+                      color: AppColors.whiteSecondary,
+                      size: 48,
                     ),
                   ),
                 ),
@@ -115,7 +104,6 @@ class ComicDetailHeader extends StatelessWidget {
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.5),
                     blurRadius: 15,
-                    offset: const Offset(0, 8),
                   ),
                 ],
                 border: Border.all(
