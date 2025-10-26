@@ -39,16 +39,43 @@ class _HomeScreenNewState extends State<HomeScreenNew> {
   }
 
   Future<void> _loadAllSections() async {
-    // Load semua section secara parallel
-    await Future.wait([
-      _loadFeaturedTitles(),
-      _loadPopularThisWeek(),
-      _loadNewReleases(),
-      _loadTopRated(),
-      _loadTrendingNow(),
-      _loadSeasonalManga(),
-      _loadRecentlyAdded(),
-    ]);
+    // Use single API call for all sections to avoid rate limiting
+    try {
+      final mixedFeed = await _mangaService.getMixedFeed();
+      
+      setState(() {
+        // Update all sections from single API response
+        _sectionData['featured'] = mixedFeed['featured'] ?? [];
+        _sectionData['popular'] = mixedFeed['popular'] ?? [];
+        _sectionData['newReleases'] = mixedFeed['newReleases'] ?? [];
+        _sectionData['topRated'] = mixedFeed['topRated'] ?? [];
+        _sectionData['trending'] = mixedFeed['trending'] ?? [];
+        _sectionData['seasonal'] = mixedFeed['seasonal'] ?? [];
+        
+        // Mark all sections as loaded
+        _sectionLoading['featured'] = false;
+        _sectionLoading['popular'] = false;
+        _sectionLoading['newReleases'] = false;
+        _sectionLoading['topRated'] = false;
+        _sectionLoading['trending'] = false;
+        _sectionLoading['seasonal'] = false;
+      });
+      
+      // Load additional sections separately if needed (with delay)
+      await Future.delayed(Duration(seconds: 3));
+      await _loadHiddenGems();
+      
+      await Future.delayed(Duration(seconds: 3));
+      await _loadRecentlyAdded();
+    } catch (e) {
+      debugPrint('Error loading mixed feed: $e');
+      // Fallback to individual loads with longer delays
+      await _loadFeaturedTitles();
+      await Future.delayed(Duration(seconds: 3));
+      await _loadPopularThisWeek();
+      await Future.delayed(Duration(seconds: 3));
+      await _loadNewReleases();
+    }
   }
 
   Future<void> _loadFeaturedTitles() async {
@@ -151,22 +178,22 @@ class _HomeScreenNewState extends State<HomeScreenNew> {
     }
   }
 
-  Future<void> _loadSeasonalManga() async {
+  Future<void> _loadHiddenGems() async {
     setState(() {
-      _sectionLoading['seasonal'] = true;
-      _sectionErrors['seasonal'] = null;
+      _sectionLoading['hiddenGems'] = true;
+      _sectionErrors['hiddenGems'] = null;
     });
 
     try {
-      final manga = await _mangaService.getSeasonalManga();
+      final manga = await _mangaService.getHiddenGems();
       setState(() {
-        _sectionData['seasonal'] = manga;
-        _sectionLoading['seasonal'] = false;
+        _sectionData['hiddenGems'] = manga;
+        _sectionLoading['hiddenGems'] = false;
       });
     } catch (e) {
       setState(() {
-        _sectionErrors['seasonal'] = e.toString();
-        _sectionLoading['seasonal'] = false;
+        _sectionErrors['hiddenGems'] = e.toString();
+        _sectionLoading['hiddenGems'] = false;
       });
     }
   }
@@ -260,6 +287,7 @@ class _HomeScreenNewState extends State<HomeScreenNew> {
       characters: manga.characters,
       staff: manga.staff,
       externalLinks: null, // Will be loaded separately in AboutTabNew
+      trailer: manga.trailer, // Include trailer data
     );
 
     Navigator.of(context).push(
@@ -400,14 +428,14 @@ class _HomeScreenNewState extends State<HomeScreenNew> {
                 onMangaTap: _onMangaTap,
               ),
 
-            // Seasonal Manga
-            if (_sectionData['seasonal']?.isNotEmpty == true)
+            // Hidden Gems
+            if (_sectionData['hiddenGems']?.isNotEmpty == true)
               MangaSection(
-                title: 'Seasonal Manga',
-                manga: _sectionData['seasonal']!,
-                isLoading: _sectionLoading['seasonal'] ?? false,
-                error: _sectionErrors['seasonal'],
-                onRetry: _loadSeasonalManga,
+                title: 'Hidden Gems',
+                manga: _sectionData['hiddenGems']!,
+                isLoading: _sectionLoading['hiddenGems'] ?? false,
+                error: _sectionErrors['hiddenGems'],
+                onRetry: _loadHiddenGems,
                 onMangaTap: _onMangaTap,
               ),
 

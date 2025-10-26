@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../../core/constants.dart';
 import '../../data/models/nandogami_item.dart';
 import '../../data/models/manga.dart';
@@ -37,11 +38,20 @@ class _AboutTabNewState extends State<AboutTabNew> {
   @override
   void initState() {
     super.initState();
-    // Load characters, relations, recommendations, and external links automatically
+    // Load data with delays to avoid rate limiting
     _loadCharacters();
-    _loadRelations();
-    _loadRecommendations();
-    _loadExternalLinks();
+    
+    Future.delayed(Duration(milliseconds: 1500), () {
+      if (mounted) _loadRelations();
+    });
+    
+    Future.delayed(Duration(milliseconds: 3000), () {
+      if (mounted) _loadRecommendations();
+    });
+    
+    Future.delayed(Duration(milliseconds: 4500), () {
+      if (mounted) _loadExternalLinks();
+    });
   }
 
   @override
@@ -74,6 +84,12 @@ class _AboutTabNewState extends State<AboutTabNew> {
           // Synopsis Section
           _buildSynopsisSection(theme),
           const SizedBox(height: 24),
+          
+          // Trailer Section
+          if (item.trailer != null)
+            _buildTrailerSection(theme),
+          if (item.trailer != null)
+            const SizedBox(height: 24),
           
           // Characters Section - Lazy Loading
           _buildCharactersSectionLazy(theme),
@@ -309,6 +325,53 @@ class _AboutTabNewState extends State<AboutTabNew> {
             height: 1.5,
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildTrailerSection(TextTheme theme) {
+    final trailer = widget.item.trailer;
+    if (trailer == null) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Trailer',
+          style: theme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.onSurface),
+        ),
+        const SizedBox(height: 12),
+        if (trailer.isYouTube && trailer.id != null)
+          _TrailerPlayer(videoId: trailer.id!)
+        else
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.grayDark.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.grayDark.withValues(alpha: 0.5),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Trailer not available or unsupported format',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -1236,6 +1299,7 @@ class _AboutTabNewState extends State<AboutTabNew> {
       relations: relation.manga.relations,
       characters: relation.manga.characters,
       staff: relation.manga.staff,
+      trailer: relation.manga.trailer, // Include trailer data
     );
 
     // Navigate to DetailScreen
@@ -1474,6 +1538,104 @@ class _StatusButton extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _TrailerPlayer extends StatefulWidget {
+  final String videoId;
+
+  const _TrailerPlayer({required this.videoId});
+
+  @override
+  State<_TrailerPlayer> createState() => _TrailerPlayerState();
+}
+
+class _TrailerPlayerState extends State<_TrailerPlayer> {
+  late YoutubePlayerController _controller;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    try {
+      _controller = YoutubePlayerController(
+        initialVideoId: widget.videoId,
+        flags: const YoutubePlayerFlags(
+          autoPlay: false,
+          mute: false,
+          enableCaption: true,
+          loop: false,
+          controlsVisibleAtStart: true,
+          hideControls: false,
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        _hasError = true;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    if (!_hasError) {
+      _controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasError) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.grayDark.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.grayDark.withValues(alpha: 0.5),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.error_outline,
+              color: Colors.redAccent,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Failed to load trailer',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: YoutubePlayer(
+        controller: _controller,
+        showVideoProgressIndicator: true,
+        progressIndicatorColor: Theme.of(context).colorScheme.primary,
+        progressColors: ProgressBarColors(
+          playedColor: Theme.of(context).colorScheme.primary,
+          handleColor: Theme.of(context).colorScheme.primary,
+          backgroundColor: AppColors.grayDark.withValues(alpha: 0.5),
+        ),
+        onReady: () {
+          // Player is ready
+        },
+        onEnded: (metadata) {
+          // Video ended
+        },
       ),
     );
   }

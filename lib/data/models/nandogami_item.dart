@@ -44,6 +44,7 @@ class NandogamiItem {
   final List<MangaCharacter>? characters;
   final List<MangaStaff>? staff;
   final List<ExternalLink>? externalLinks;
+  final MangaTrailer? trailer;
   
 
   const NandogamiItem({
@@ -88,6 +89,7 @@ class NandogamiItem {
     this.characters,
     this.staff,
     this.externalLinks,
+    this.trailer,
   });
 
   factory NandogamiItem.fromJson(Map<String, dynamic> j, [String? docId]) =>
@@ -134,6 +136,7 @@ class NandogamiItem {
         characters: (j['characters'] as List<dynamic>?)?.map((c) => MangaCharacter.fromJson(c)).toList(),
         staff: (j['staff'] as List<dynamic>?)?.map((s) => MangaStaff.fromJson(s)).toList(),
         externalLinks: (j['externalLinks'] as List<dynamic>?)?.map((l) => ExternalLink.fromJson(l)).toList(),
+        trailer: j['trailer'] != null ? MangaTrailer.fromJson(j['trailer']) : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -178,5 +181,6 @@ class NandogamiItem {
     if (characters != null) 'characters': characters?.map((c) => c.toJson()).toList(),
     if (staff != null) 'staff': staff?.map((s) => s.toJson()).toList(),
     if (externalLinks != null) 'externalLinks': externalLinks?.map((l) => l.toJson()).toList(),
+    if (trailer != null) 'trailer': trailer?.toJson(),
   };
 }

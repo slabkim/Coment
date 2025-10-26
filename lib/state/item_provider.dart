@@ -54,28 +54,14 @@ class ItemProvider extends ChangeNotifier {
       final mixedFeed = await repo.getMixedFeed();
       
       // Convert to NandogamiItems for compatibility
+      // All sections are now loaded from single mixedFeed API call
       _featured = ComicAdapter.toNandogamiItems(mixedFeed['featured'] ?? []);
       _popular = ComicAdapter.toNandogamiItems(mixedFeed['popular'] ?? []);
       _newReleases = ComicAdapter.toNandogamiItems(mixedFeed['newReleases'] ?? []);
+      _topRated = ComicAdapter.toNandogamiItems(mixedFeed['topRated'] ?? []);
+      _trending = ComicAdapter.toNandogamiItems(mixedFeed['trending'] ?? []);
       _categoryPicks = ComicAdapter.toNandogamiItems(mixedFeed['categories'] ?? []);
       _seasonal = ComicAdapter.toNandogamiItems(mixedFeed['seasonal'] ?? []);
-      
-      // Try to load additional sections, but don't fail if they don't work
-      try {
-        await Future.delayed(Duration(milliseconds: 500));
-        _topRated = ComicAdapter.toNandogamiItems(await repo.getTopRated());
-      } catch (e) {
-        print('Failed to load top rated: $e');
-        _topRated = _featured; // Use featured as fallback
-      }
-      
-      try {
-        await Future.delayed(Duration(milliseconds: 500));
-        _trending = ComicAdapter.toNandogamiItems(await repo.getTrending());
-      } catch (e) {
-        print('Failed to load trending: $e');
-        _trending = _featured; // Use featured as fallback
-      }
       
       // Build _all from all sections
       final allComics = <String, NandogamiItem>{};
@@ -127,21 +113,108 @@ class ItemProvider extends ChangeNotifier {
       _filtered = _all;
     } else {
       final q = _query.toLowerCase();
-      _filtered = _all.where((e) {
-        final inTitle = e.title.toLowerCase().contains(q);
-        final inDesc = e.description.toLowerCase().contains(q);
-        final inAlt =
-            (e.alternativeTitles ?? const <String>[]) // alt titles
-                .any((t) => t.toLowerCase().contains(q));
-        final inCats =
-            (e.categories ?? const <String>[]) // categories/tags
-                .any((t) => t.toLowerCase().contains(q));
-        final inThemes =
-            (e.themes ?? const <String>[]) // themes
-                .any((t) => t.toLowerCase().contains(q));
-        return inTitle || inDesc || inAlt || inCats || inThemes;
-      }).toList();
+      
+      // Filter and score items by relevance
+      final scoredItems = <MapEntry<NandogamiItem, double>>[];
+      
+      for (final e in _all) {
+        double score = 0.0;
+        final title = e.title.toLowerCase();
+        final desc = e.description.toLowerCase();
+        
+        // Exact title match = highest score
+        if (title == q) {
+          score += 100.0;
+        }
+        // Title starts with query = very high score
+        else if (title.startsWith(q)) {
+          score += 50.0;
+        }
+        // Title contains query = high score
+        else if (title.contains(q)) {
+          score += 25.0;
+        }
+        
+        // Alternative titles
+        final inAlt = (e.alternativeTitles ?? const <String>[])
+            .any((t) => t.toLowerCase().contains(q));
+        if (inAlt) score += 20.0;
+        
+        // Description contains query
+        if (desc.contains(q)) score += 5.0;
+        
+        // Categories/genres match
+        final inCats = (e.categories ?? const <String>[])
+            .any((t) => t.toLowerCase().contains(q));
+        if (inCats) score += 3.0;
+        
+        // Themes match
+        final inThemes = (e.themes ?? const <String>[])
+            .any((t) => t.toLowerCase().contains(q));
+        if (inThemes) score += 2.0;
+        
+        // Fuzzy matching for typos
+        if (score == 0 && q.length > 3) {
+          final fuzzyScore = _fuzzyMatchScore(q, title);
+          if (fuzzyScore > 0.7) {
+            score += fuzzyScore * 15.0; // Scale fuzzy score
+          }
+        }
+        
+        // Add popularity bonus (normalize popularity to 0-10 range)
+        final popularity = e.popularity ?? 0;
+        final popularityBonus = (popularity / 10000).clamp(0, 10);
+        score += popularityBonus;
+        
+        if (score > 0) {
+          scoredItems.add(MapEntry(e, score));
+        }
+      }
+      
+      // Sort by score (descending) and take results
+      scoredItems.sort((a, b) => b.value.compareTo(a.value));
+      _filtered = scoredItems.map((e) => e.key).toList();
     }
+  }
+  
+  /// Calculate fuzzy match score between 0 and 1
+  double _fuzzyMatchScore(String query, String target) {
+    // Levenshtein distance ratio
+    final distance = _levenshteinDistance(query, target);
+    final maxLength = query.length > target.length ? query.length : target.length;
+    if (maxLength == 0) return 1.0;
+    return 1.0 - (distance / maxLength);
+  }
+  
+  /// Calculate Levenshtein distance (edit distance)
+  int _levenshteinDistance(String s1, String s2) {
+    if (s1 == s2) return 0;
+    if (s1.isEmpty) return s2.length;
+    if (s2.isEmpty) return s1.length;
+    
+    final len1 = s1.length;
+    final len2 = s2.length;
+    final matrix = List.generate(len1 + 1, (i) => List.filled(len2 + 1, 0));
+    
+    for (var i = 0; i <= len1; i++) {
+      matrix[i][0] = i;
+    }
+    for (var j = 0; j <= len2; j++) {
+      matrix[0][j] = j;
+    }
+    
+    for (var i = 1; i <= len1; i++) {
+      for (var j = 1; j <= len2; j++) {
+        final cost = s1[i - 1] == s2[j - 1] ? 0 : 1;
+        matrix[i][j] = [
+          matrix[i - 1][j] + 1,      // deletion
+          matrix[i][j - 1] + 1,      // insertion
+          matrix[i - 1][j - 1] + cost, // substitution
+        ].reduce((a, b) => a < b ? a : b);
+      }
+    }
+    
+    return matrix[len1][len2];
   }
 
   Future<void> toggleFavorite(String id) async {

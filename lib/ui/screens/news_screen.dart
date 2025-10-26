@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants.dart';
 import '../../core/auth_helper.dart';
-import '../../data/services/news_service.dart';
+import '../../data/services/anime_news_service.dart';
 import '../../data/models/news_article.dart';
 
 class NewsScreen extends StatefulWidget {
@@ -13,7 +13,7 @@ class NewsScreen extends StatefulWidget {
 }
 
 class _NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
-  final NewsService _newsService = NewsService();
+  final AnimeNewsService _newsService = AnimeNewsService();
   late TabController _tabController;
   
   List<NewsArticle> _latestNews = [];
@@ -41,23 +41,28 @@ class _NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     });
 
     try {
-      final results = await Future.wait([
-        _newsService.getLatestNews(pageSize: 20),
-        _newsService.getTrendingNews(pageSize: 20),
-      ]);
+      // Latest: Sorted by date
+      final latest = await _newsService.getLatestNews(pageSize: 25);
+      
+      // Trending: Popular anime/manga news
+      final trending = await _newsService.getTrendingNews(pageSize: 25);
 
+      if (!mounted) return;
+      
       setState(() {
-        _latestNews = results[0].articles;
-        _trendingNews = results[1].articles;
+        _latestNews = latest.articles;
+        _trendingNews = trending.articles;
         _loading = false;
       });
     } catch (e) {
       // Fallback to sample data if API fails
+      if (!mounted) return;
+      
       setState(() {
         _latestNews = _getFallbackNews();
         _trendingNews = _getFallbackNews();
         _loading = false;
-        _error = 'Using sample data. API Error: $e';
+        _error = 'Tap to retry with real news';
       });
     }
   }

@@ -34,6 +34,7 @@ class Manga {
   final List<MangaCharacter>? characters;
   final List<MangaStaff>? staff;
   final List<ExternalLink>? externalLinks;
+  final MangaTrailer? trailer;
 
   Manga({
     required this.id,
@@ -68,6 +69,7 @@ class Manga {
     this.characters,
     this.staff,
     this.externalLinks,
+    this.trailer,
   });
 
   factory Manga.fromJson(Map<String, dynamic> json) {
@@ -114,6 +116,7 @@ class Manga {
         }
         return null;
       }(),
+      trailer: json['trailer'] != null ? MangaTrailer.fromJson(json['trailer']) : null,
     );
   }
 
@@ -151,6 +154,7 @@ class Manga {
       'characters': characters?.map((c) => c.toJson()).toList(),
       'staff': staff?.map((s) => s.toJson()).toList(),
       'externalLinks': externalLinks?.map((l) => l.toJson()).toList(),
+      'trailer': trailer?.toJson(),
     };
   }
 
@@ -349,4 +353,38 @@ class PageInfo {
       total: json['total'] ?? 0,
     );
   }
+}
+
+class MangaTrailer {
+  final String? id;
+  final String? site;
+  final String? thumbnail;
+
+  MangaTrailer({
+    this.id,
+    this.site,
+    this.thumbnail,
+  });
+
+  factory MangaTrailer.fromJson(Map<String, dynamic> json) {
+    return MangaTrailer(
+      id: json['id'],
+      site: json['site'],
+      thumbnail: json['thumbnail'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'site': site,
+      'thumbnail': thumbnail,
+    };
+  }
+
+  bool get isYouTube => site?.toLowerCase() == 'youtube';
+  bool get isDailymotion => site?.toLowerCase() == 'dailymotion';
+  
+  String? get youtubeUrl => isYouTube && id != null ? 'https://www.youtube.com/watch?v=$id' : null;
+  String? get dailymotionUrl => isDailymotion && id != null ? 'https://www.dailymotion.com/video/$id' : null;
 }

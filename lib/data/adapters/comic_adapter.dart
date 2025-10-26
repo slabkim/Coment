@@ -50,6 +50,7 @@ class ComicAdapter {
       characters: null, // Not available in ComicItem
       staff: null, // Not available in ComicItem
       externalLinks: null, // Not available in ComicItem
+      trailer: null, // Not available in ComicItem
     );
   }
 

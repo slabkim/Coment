@@ -10,16 +10,20 @@ class SimpleAniListService {
   
   // Rate limiting
   static DateTime? _lastRequestTime;
-  static const Duration _minRequestInterval = Duration(milliseconds: 1500); // Increased to 1.5 seconds to avoid rate limiting
+  static const Duration _minRequestInterval = Duration(milliseconds: 2000); // 2 seconds between requests to avoid rate limiting
   
   // Cache for external links to reduce API calls
   static final Map<int, List<ExternalLink>> _externalLinksCache = {};
   
-  // Cache for mixed feed data
+  // Cache for mixed feed data with timestamp
   static Map<String, List<Manga>> _mixedFeedCache = {};
+  static DateTime? _mixedFeedCacheTime;
+  static const Duration _mixedFeedCacheDuration = Duration(minutes: 30); // Cache for 30 minutes
   
-  // Cache for search results
+  // Cache for search results with expiry
   static final Map<String, List<Manga>> _searchCache = {};
+  static final Map<String, DateTime> _searchCacheTime = {};
+  static const Duration _searchCacheDuration = Duration(minutes: 10); // Cache for 10 minutes
 
   /// Featured Titles - menggunakan ID yang sudah ditentukan
   Future<List<Manga>> getFeaturedTitles() async {
@@ -52,6 +56,11 @@ class SimpleAniListService {
             favourites
             seasonYear
             season
+            trailer {
+              id
+              site
+              thumbnail
+            }
           }
         }
       }
@@ -88,6 +97,11 @@ class SimpleAniListService {
             favourites
             seasonYear
             season
+            trailer {
+              id
+              site
+              thumbnail
+            }
           }
         }
       }
@@ -124,6 +138,11 @@ class SimpleAniListService {
             favourites
             seasonYear
             season
+            trailer {
+              id
+              site
+              thumbnail
+            }
           }
         }
       }
@@ -160,6 +179,11 @@ class SimpleAniListService {
             favourites
             seasonYear
             season
+            trailer {
+              id
+              site
+              thumbnail
+            }
           }
         }
       }
@@ -168,12 +192,12 @@ class SimpleAniListService {
     return _executeQuery(query);
   }
 
-  /// Trending Now - kombinasi sort: [TRENDING_DESC, POPULARITY_DESC]
+  /// Trending Now - sort: FAVOURITES_DESC (most favorited manga)
   Future<List<Manga>> getTrendingNow() async {
     final query = '''
       query {
         Page(perPage: $_perPage) {
-          media(type: MANGA, sort: [TRENDING_DESC, POPULARITY_DESC], isAdult: false) {
+          media(type: MANGA, sort: FAVOURITES_DESC, isAdult: false) {
             id
             title {
               romaji
@@ -196,6 +220,11 @@ class SimpleAniListService {
             favourites
             seasonYear
             season
+            trailer {
+              id
+              site
+              thumbnail
+            }
           }
         }
       }
@@ -236,6 +265,58 @@ class SimpleAniListService {
             favourites
             seasonYear
             season
+            trailer {
+              id
+              site
+              thumbnail
+            }
+          }
+        }
+      }
+    ''';
+
+    return _executeQuery(query);
+  }
+
+  /// Hidden Gems - high rated but underrated manga (score >= 75, popularity < 50000)
+  Future<List<Manga>> getHiddenGems() async {
+    final query = '''
+      query {
+        Page(perPage: $_perPage) {
+          media(
+            type: MANGA, 
+            sort: SCORE_DESC, 
+            averageScore_greater: 75,
+            popularity_lesser: 50000,
+            isAdult: false
+          ) {
+            id
+            title {
+              romaji
+              english
+              native
+            }
+            description
+            coverImage {
+              large
+              medium
+            }
+            bannerImage
+            genres
+            format
+            status
+            chapters
+            averageScore
+            meanScore
+            popularity
+            favourites
+            seasonYear
+            season
+            trailer {
+              id
+              site
+              thumbnail
+            }
           }
         }
       }
@@ -272,6 +353,11 @@ class SimpleAniListService {
             favourites
             seasonYear
             season
+            trailer {
+              id
+              site
+              thumbnail
+            }
           }
         }
       }
@@ -310,6 +396,11 @@ class SimpleAniListService {
             favourites
             seasonYear
             season
+            trailer {
+              id
+              site
+              thumbnail
+            }
           }
         }
       }
@@ -389,10 +480,13 @@ class SimpleAniListService {
           final media = jsonData['data']?['Page']?['media'] as List<dynamic>? ?? [];
           return media.map((item) => Manga.fromJson(item)).toList();
         } else if (response.statusCode == 429) {
-          // Rate limited
-          debugPrint('Rate limited (429), waiting ${attempt * 2} seconds');
+          // Rate limited - use exponential backoff with longer delays
+          final waitSeconds = attempt * 4; // 4, 8, 12 seconds
+          debugPrint('Rate limited (429), waiting $waitSeconds seconds');
           if (attempt < 3) {
-            await Future.delayed(Duration(seconds: attempt * 2));
+            await Future.delayed(Duration(seconds: waitSeconds));
+            // Reset last request time to prevent immediate next request
+            _lastRequestTime = DateTime.now();
             continue;
           }
           throw Exception('Rate limited');
@@ -473,6 +567,11 @@ class SimpleAniListService {
             day
           }
           synonyms
+          trailer {
+            id
+            site
+            thumbnail
+          }
         }
       }
     ''';
@@ -542,6 +641,11 @@ class SimpleAniListService {
             day
           }
           synonyms
+          trailer {
+            id
+            site
+            thumbnail
+          }
           externalLinks {
             site
             url
@@ -997,19 +1101,28 @@ class SimpleAniListService {
     return _executeQuery(query);
   }
 
-  /// Search manga with caching
+  /// Search manga with caching and popularity sorting
+  /// Fuzzy matching is handled client-side in ItemProvider to avoid rate limiting
   Future<List<Manga>> searchManga(String query) async {
-    // Check cache first
+    // Check cache first with expiry
     final cacheKey = query.toLowerCase().trim();
-    if (_searchCache.containsKey(cacheKey)) {
-      debugPrint('Using cached search results for: $query');
-      return _searchCache[cacheKey]!;
+    if (_searchCache.containsKey(cacheKey) && _searchCacheTime.containsKey(cacheKey)) {
+      final cacheAge = DateTime.now().difference(_searchCacheTime[cacheKey]!);
+      if (cacheAge < _searchCacheDuration) {
+        debugPrint('Using cached search results for: $query (age: ${cacheAge.inMinutes}m)');
+        return _searchCache[cacheKey]!;
+      } else {
+        // Cache expired, remove it
+        _searchCache.remove(cacheKey);
+        _searchCacheTime.remove(cacheKey);
+      }
     }
 
+    // Single API call with popularity sorting
     final searchQuery = '''
       query {
         Page(perPage: $_perPage) {
-          media(type: MANGA, search: "$query", isAdult: false) {
+          media(type: MANGA, search: "$query", sort: POPULARITY_DESC, isAdult: false) {
             id
             title { romaji english native }
             description
@@ -1025,6 +1138,11 @@ class SimpleAniListService {
             favourites
             seasonYear
             season
+            trailer {
+              id
+              site
+              thumbnail
+            }
           }
         }
       }
@@ -1032,8 +1150,10 @@ class SimpleAniListService {
 
     try {
       final results = await _executeQuery(searchQuery);
-      // Cache the results
+      
+      // Cache the results with timestamp
       _searchCache[cacheKey] = results;
+      _searchCacheTime[cacheKey] = DateTime.now();
       debugPrint('Cached search results for: $query (${results.length} items)');
       return results;
     } catch (e) {
@@ -1044,10 +1164,18 @@ class SimpleAniListService {
 
   /// Get mixed feed for home page sections using single GraphQL query
   Future<Map<String, List<Manga>>> getMixedFeed() async {
-    // Check cache first
-    if (_mixedFeedCache.isNotEmpty) {
-      debugPrint('Using cached mixed feed data');
-      return _mixedFeedCache;
+    // Check cache first with expiry
+    if (_mixedFeedCache.isNotEmpty && _mixedFeedCacheTime != null) {
+      final cacheAge = DateTime.now().difference(_mixedFeedCacheTime!);
+      if (cacheAge < _mixedFeedCacheDuration) {
+        debugPrint('Using cached mixed feed data (age: ${cacheAge.inMinutes}m)');
+        return _mixedFeedCache;
+      } else {
+        // Cache expired
+        debugPrint('Mixed feed cache expired, refreshing...');
+        _mixedFeedCache.clear();
+        _mixedFeedCacheTime = null;
+      }
     }
 
     final query = '''
@@ -1068,6 +1196,7 @@ class SimpleAniListService {
             meanScore
             popularity
             favourites
+            trailer { id site thumbnail }
           }
         }
         
@@ -1087,6 +1216,7 @@ class SimpleAniListService {
             meanScore
             popularity
             favourites
+            trailer { id site thumbnail }
           }
         }
         
@@ -1106,6 +1236,7 @@ class SimpleAniListService {
             meanScore
             popularity
             favourites
+            trailer { id site thumbnail }
           }
         }
         
@@ -1125,6 +1256,7 @@ class SimpleAniListService {
             meanScore
             popularity
             favourites
+            trailer { id site thumbnail }
           }
         }
         
@@ -1144,6 +1276,7 @@ class SimpleAniListService {
             meanScore
             popularity
             favourites
+            trailer { id site thumbnail }
           }
         }
         
@@ -1163,6 +1296,7 @@ class SimpleAniListService {
             meanScore
             popularity
             favourites
+            trailer { id site thumbnail }
           }
         }
       }
@@ -1204,8 +1338,9 @@ class SimpleAniListService {
           'seasonal': _parseMangaList(data['data']['seasonal']['media']),
         };
         
-        // Cache the result
+        // Cache the result with timestamp
         _mixedFeedCache = result;
+        _mixedFeedCacheTime = DateTime.now();
         debugPrint('Mixed feed cached successfully');
         return result;
       } else {
@@ -1238,19 +1373,23 @@ class SimpleAniListService {
   /// Clear mixed feed cache
   static void clearMixedFeedCache() {
     _mixedFeedCache.clear();
+    _mixedFeedCacheTime = null;
     debugPrint('Mixed feed cache cleared');
   }
 
   /// Clear search cache
   static void clearSearchCache() {
     _searchCache.clear();
+    _searchCacheTime.clear();
     debugPrint('Search cache cleared');
   }
 
   /// Clear all caches
   static void clearAllCaches() {
     _mixedFeedCache.clear();
+    _mixedFeedCacheTime = null;
     _searchCache.clear();
+    _searchCacheTime.clear();
     _externalLinksCache.clear();
     debugPrint('All caches cleared');
   }
