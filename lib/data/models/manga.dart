@@ -109,11 +109,8 @@ class Manga {
       staff: (json['staff']?['edges'] as List<dynamic>?)?.map((edge) => MangaStaff.fromJson(edge)).toList(),
       externalLinks: () {
         final links = json['externalLinks'] as List<dynamic>?;
-        debugPrint('Raw external links: $links');
         if (links != null) {
-          final parsed = links.map((link) => ExternalLink.fromJson(link)).toList();
-          debugPrint('Parsed external links: ${parsed.length} items');
-          return parsed;
+          return links.map((link) => ExternalLink.fromJson(link)).toList();
         }
         return null;
       }(),

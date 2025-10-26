@@ -73,9 +73,23 @@ service cloud.firestore {
     }
 
     match /chat_history/{historyId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+      // FIXED: historyId format is "{chatId}_{userId}"
+      // Allow read if user is a participant in the chat (for read receipts)
+      allow read: if request.auth != null && (
+        historyId.matches('.*_' + request.auth.uid + '$') ||
+        request.auth.uid == resource.data.userId ||
+        request.auth.uid in get(/databases/$(database)/documents/chats/$(resource.data.chatId)).data.participants
+      );
+      // Allow create/update only for own history
+      allow create: if request.auth != null && (
+        historyId.matches('.*_' + request.auth.uid + '$') &&
+        request.resource.data.userId == request.auth.uid &&
+        request.auth.uid in get(/databases/$(database)/documents/chats/$(request.resource.data.chatId)).data.participants
+      );
+      allow update: if request.auth != null && (
+        historyId.matches('.*_' + request.auth.uid + '$') ||
+        request.auth.uid == resource.data.userId
+      );
       allow delete: if false;
     }
 
@@ -113,5 +127,3 @@ service cloud.firestore {
     }
   }
 }
-
-

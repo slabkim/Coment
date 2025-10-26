@@ -47,3 +47,9 @@ app.*.map.json
 # API Keys & Environment Variables
 .env
 api_keys_temp.txt
+
+# Firebase Admin SDK credentials (sensitive)
+*firebase-adminsdk*.json
+
+# Cursor IDE
+.cursor/

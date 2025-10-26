@@ -68,10 +68,6 @@ class _StatusList extends StatelessWidget {
             ),
           );
         }
-        print('🔍 Reading List Debug:');
-        print('   Status: $status');
-        print('   Found IDs: $ids');
-        print('   ItemProvider has ${prov.items.length} items');
         
         // Use FutureBuilder to handle async fallback
         return FutureBuilder<List<NandogamiItem>>(
@@ -172,17 +168,12 @@ class _StatusList extends StatelessWidget {
     final items = <NandogamiItem>[];
     
     for (final id in ids) {
-      print('   Loading ID $id...');
       final item = await prov.findByIdWithFallback(id);
       if (item != null) {
         items.add(item);
-        print('   ✅ Loaded: ${item.title}');
-      } else {
-        print('   ❌ Failed to load: $id');
       }
     }
     
-    print('   Final loaded items: ${items.length}');
     return items;
   }
 }

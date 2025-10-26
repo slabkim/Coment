@@ -26,7 +26,20 @@ class UserService {
         'photoUrl': photoUrl ?? '',
         'bio': '',
         'joinAt': DateTime.now().millisecondsSinceEpoch,
+        'lastSeen': DateTime.now().millisecondsSinceEpoch,
       });
+    }
+  }
+  
+  /// Update user's last seen timestamp
+  Future<void> updateLastSeen(String uid) async {
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      await _db.collection('users').doc(uid).set({
+        'lastSeen': timestamp,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      // Silently fail
     }
   }
 

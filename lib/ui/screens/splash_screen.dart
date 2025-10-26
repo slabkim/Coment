@@ -90,11 +90,8 @@ class _SplashScreenState extends State<SplashScreen>
       
       // Start loading data di background
       await itemProvider.init();
-      
-      print('✅ Preloading data komik selesai!');
     } catch (e) {
-      print('⚠️ Error preloading data: $e');
-      // Tidak apa-apa jika gagal, user masih bisa loading nanti
+      // Silently ignore preload errors
     }
   }
 

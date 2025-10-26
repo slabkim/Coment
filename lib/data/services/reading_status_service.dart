@@ -73,48 +73,23 @@ class ReadingStatusService {
     required String userId,
     required String status,
   }) {
-    print('🔍 watchTitlesByStatus called:');
-    print('   userId: $userId');
-    print('   status: $status');
-    
     return _db
         .collection('reading_status')
         .where('userId', isEqualTo: userId)
         .where(fieldStatus, isEqualTo: status)
         .snapshots()
-        .map((s) {
-          final titleIds = s.docs.map((d) => (d.data()['titleId'] as String)).toList();
-          print('   Found ${titleIds.length} titles with status $status: $titleIds');
-          return titleIds;
-        });
+        .map((s) => s.docs.map((d) => (d.data()['titleId'] as String)).toList());
   }
 
   /// Watch all title IDs for a user with any reading status (WANT_TO_READ, READING, COMPLETED, DROPPED, PAUSED).
   Stream<List<String>> watchAllReadingTitles(String userId) {
-    print('🔍 watchAllReadingTitles called:');
-    print('   userId: $userId');
-    
     return _db
         .collection('reading_status')
         .where('userId', isEqualTo: userId)
         .snapshots()
         .map((s) {
-          print('   Raw documents found: ${s.docs.length}');
-          for (int i = 0; i < s.docs.length; i++) {
-            final doc = s.docs[i];
-            final data = doc.data();
-            print('   Doc $i: titleId=${data['titleId']}, status=${data['status']}, docId=${doc.id}');
-          }
-          
           final titleIds = s.docs.map((d) => (d.data()['titleId'] as String)).toList();
-          final uniqueTitleIds = titleIds.toSet().toList();
-          
-          print('   All titleIds: $titleIds');
-          print('   Unique titleIds: $uniqueTitleIds');
-          print('   Total count: ${titleIds.length}, Unique count: ${uniqueTitleIds.length}');
-          
-          // Return unique title IDs to avoid duplicates
-          return uniqueTitleIds;
+          return titleIds.toSet().toList(); // Return unique title IDs to avoid duplicates
         });
   }
 }

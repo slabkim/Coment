@@ -83,15 +83,6 @@ class ItemProvider extends ChangeNotifier {
         allComics[item.id] = item;
       }
       _all = allComics.values.toList();
-      print('📚 ItemProvider loaded ${_all.length} total comics');
-      print('   Featured: ${_featured.length}');
-      print('   Popular: ${_popular.length}');
-      print('   New Releases: ${_newReleases.length}');
-      print('   Categories: ${_categoryPicks.length}');
-      print('   Seasonal: ${_seasonal.length}');
-      print('   Top Rated: ${_topRated.length}');
-      print('   Trending: ${_trending.length}');
-      
       _applyFilter();
     } catch (e, stackTrace) {
       ApiErrorHandler.logError(e, stackTrace);
@@ -167,17 +158,9 @@ class ItemProvider extends ChangeNotifier {
   bool isFavorite(String id) => _favoriteIds.contains(id);
 
   NandogamiItem? findById(String id) {
-    print('🔍 ItemProvider.findById called for id: $id');
-    print('   _all length: ${_all.length}');
-    if (_all.isNotEmpty) {
-      print('   First few IDs: ${_all.take(3).map((e) => e.id).toList()}');
-    }
     try {
-      final item = _all.firstWhere((e) => e.id == id);
-      print('   ✅ Found: ${item.title}');
-      return item;
+      return _all.firstWhere((e) => e.id == id);
     } catch (_) {
-      print('   ❌ Not found in _all list');
       return null;
     }
   }
@@ -191,22 +174,16 @@ class ItemProvider extends ChangeNotifier {
     }
 
     // If not found, try to fetch from API
-    print('🔄 Fetching comic $id from API...');
     try {
       final anilistId = int.tryParse(id);
       if (anilistId != null) {
         final comicItem = await repo.getDetail(anilistId);
-        // Convert ComicItem to NandogamiItem
         final comic = ComicAdapter.toNandogamiItem(comicItem);
-        // Add to cache for future use
         _all.add(comic);
-        print('   ✅ Fetched and cached: ${comic.title}');
         return comic;
-      } else {
-        print('   ❌ Invalid AniList ID: $id');
       }
     } catch (e) {
-      print('   ❌ Failed to fetch from API: $e');
+      // Silently fail
     }
     
     return null;

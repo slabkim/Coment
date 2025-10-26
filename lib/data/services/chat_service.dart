@@ -22,10 +22,18 @@ class ChatService {
     final parts = [uidA, uidB]..sort();
     final key = parts.join('_');
     final doc = _db.collection(FsPaths.chats).doc(key);
-    await doc.set({
-      'participants': parts,
-      'lastMessageTime': DateTime.now().millisecondsSinceEpoch,
-    }, SetOptions(merge: true));
+    
+    // Check if chat exists first
+    final snapshot = await doc.get();
+    if (!snapshot.exists) {
+      // Only set initial data if chat doesn't exist yet
+      await doc.set({
+        'participants': parts,
+        'lastMessageTime': DateTime.now().millisecondsSinceEpoch,
+        'lastMessage': null,
+      });
+    }
+    // If chat exists, don't update anything - just return the key
     return key;
   }
 

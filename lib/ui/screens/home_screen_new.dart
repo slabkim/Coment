@@ -216,7 +216,6 @@ class _HomeScreenNewState extends State<HomeScreenNew> {
   void _onMangaTap(Manga manga) {
     // Open with basic data immediately for fast navigation
     // Preview pages will be loaded separately in PreviewTab
-    debugPrint('Opening manga: ${manga.bestTitle}');
     _openWithBasicData(manga);
   }
 
@@ -479,13 +478,6 @@ class _ProfileBadgeState extends State<_ProfileBadge> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final photo = _profile?.photoUrl ?? user?.photoURL ?? '';
-    
-    // Debug info
-    debugPrint('Profile Badge - User: ${user?.uid}');
-    debugPrint('Profile Badge - Profile Photo URL: ${_profile?.photoUrl}');
-    debugPrint('Profile Badge - Auth Photo URL: ${user?.photoURL}');
-    debugPrint('Profile Badge - Final Photo URL: $photo');
-    debugPrint('Profile Badge - Loading: $_loading');
     
     return InkWell(
       borderRadius: BorderRadius.circular(24),

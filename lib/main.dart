@@ -10,10 +10,12 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'notifications/notification_service.dart';
 import 'ui/screens/chat_screen.dart';
+import 'ui/screens/main_screen.dart';
 
 import 'core/constants.dart';
 import 'core/theme.dart';
@@ -27,25 +29,39 @@ import 'ui/screens/splash_screen.dart';
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 RemoteMessage? _pendingInitialMessage;
 
+// Native notification tap channel
+const MethodChannel _notificationChannel = MethodChannel('com.example.nandogami/notification');
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // No-op: system shows notification from payload; keep handler to enable background delivery on Android
+  // System will show notification automatically from notification payload
+  // This handler is just to keep FCM working properly
+  // Navigation is handled by native MainActivity when notification is tapped
 }
 
 Future<void> _configureMessaging() async {
   final fcm = FirebaseMessaging.instance;
   await fcm.requestPermission();
   final token = await _getFcmToken(fcm);
+  
   final user = FirebaseAuth.instance.currentUser;
   if (token != null && user != null) {
     await _persistUserFcmToken(user.uid, token);
   }
-  // Persist token when user logs in after app start
+  // Persist token and update lastSeen when user logs in after app start
   FirebaseAuth.instance.authStateChanges().listen((u) async {
     if (u != null) {
       final t = await _getFcmToken(fcm);
       if (t != null) {
         await _persistUserFcmToken(u.uid, t);
+      }
+      // Update lastSeen on auth state change
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(u.uid).set({
+          'lastSeen': DateTime.now().millisecondsSinceEpoch,
+        }, SetOptions(merge: true));
+      } catch (e) {
+        // Silently fail
       }
     }
   });
@@ -64,8 +80,12 @@ Future<void> _configureMessaging() async {
   // Background handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // Foreground message: show local notification
+  // Foreground message: show in-app notification popup
   FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+    // Show in-app notification popup
+    _showInAppNotification(message);
+    
+    // Also show local notification as backup
     await AppNotificationService.instance.showForegroundRemote(message);
   });
 
@@ -83,31 +103,109 @@ Future<void> _configureMessaging() async {
   } catch (_) {}
 }
 
+void _showInAppNotification(RemoteMessage message) {
+  // Add small delay to ensure Scaffold is fully mounted
+  Future.delayed(const Duration(milliseconds: 500), () {
+    try {
+      final context = appNavigatorKey.currentContext;
+      if (context == null) {
+        debugPrint('⚠️ In-app notification: context is null');
+        return;
+      }
+
+      final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+      final notification = message.notification;
+      
+      if (scaffoldMessenger == null || notification == null) return;
+
+      final title = notification.title ?? 'New Notification';
+      final body = notification.body ?? '';
+      final type = message.data['type'];
+
+      // Choose emoji based on notification type
+      final emoji = type == 'dm' ? '💬' : (type == 'like' ? '❤️' : (type == 'follow' ? '👤' : '🔔'));
+
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$emoji $title',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              if (body.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  body,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'OPEN',
+            textColor: Theme.of(context).colorScheme.primary,
+            onPressed: () {
+              _handleMessageNavigation(message, initial: false);
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      // Silently ignore in-app notification errors
+    }
+  });
+}
+
 Future<void> _handleMessageNavigation(RemoteMessage message, {required bool initial}) async {
   final type = message.data['type'];
-  if (type != 'dm') return;
-
-  final senderId = message.data['senderId'];
-  final chatId = message.data['chatId']; // may be unused here
-  if (senderId == null || senderId.toString().isEmpty) return;
-  final senderName = (message.data['senderName'] as String?)
-      ?? message.notification?.title
-      ?? 'Someone';
-
   final navigator = appNavigatorKey.currentState;
+  
   if (navigator == null) {
-    // If navigator isn't ready yet, queue it
     _pendingInitialMessage = message;
     return;
   }
-  navigator.push(
-    MaterialPageRoute(
-      builder: (_) => ChatScreen(
-        peerUserId: senderId,
-        peerDisplayName: senderName,
-      ),
-    ),
-  );
+
+  // Handle different notification types
+  switch (type) {
+    case 'dm':
+      final senderId = message.data['senderId'];
+      if (senderId == null || senderId.toString().isEmpty) return;
+      
+      final senderName = (message.data['senderName'] as String?)
+          ?? message.notification?.title
+          ?? 'Someone';
+      
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            peerUserId: senderId,
+            peerDisplayName: senderName,
+          ),
+        ),
+      );
+      break;
+
+    case 'like':
+    case 'follow':
+      // Navigate to MainScreen Profile tab
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const MainScreen(initialIndex: 3),
+        ),
+        (route) => false,
+      );
+      break;
+  }
 }
 
 Future<String?> _getFcmToken(FirebaseMessaging messaging) async {
@@ -244,7 +342,16 @@ Future<void> main() async {
 
   await dotenv.load(fileName: '.env');
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Initialize Firebase with error handling for duplicate app
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  } catch (e) {
+    if (e.toString().contains('duplicate-app')) {
+      debugPrint('Firebase already initialized, skipping...');
+    } else {
+      rethrow;
+    }
+  }
 
   final appCheckDebugOverride =
       (dotenv.env['FIREBASE_APPCHECK_DEBUG'] ?? '').toLowerCase() == 'true';
@@ -276,12 +383,34 @@ Future<void> main() async {
     await _handleAuthTokenFailure(error, stackTrace: stackTrace);
   }
 
-  // Initialize local notifications (channel, etc.)
+  // Initialize local notifications
   try {
+    AppNotificationService.instance.onNotificationTap = (message) {
+      _handleMessageNavigation(message, initial: false);
+    };
     await AppNotificationService.instance.initialize();
   } catch (e) {
-    debugPrint('Local notifications init failed: $e');
+    debugPrint('Notification init error: $e');
   }
+
+  // Setup native notification tap listener
+  _notificationChannel.setMethodCallHandler((call) async {
+    if (call.method == 'onNotificationTap') {
+      try {
+        final Map<dynamic, dynamic> data = call.arguments as Map<dynamic, dynamic>;
+        final Map<String, dynamic> messageData = data.map((key, value) => 
+          MapEntry(key.toString(), value));
+        
+        final message = RemoteMessage(data: messageData);
+        
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _handleMessageNavigation(message, initial: false);
+        });
+      } catch (e) {
+        debugPrint('Error handling native tap: $e');
+      }
+    }
+  });
 
   runApp(const NandogamiBootstrap());
 

@@ -1,26 +1,137 @@
 {
-    "project_info": {
-        "project_number": "190535714842",
-        "firebase_url": "https://nandogami-45016-default-rtdb.asia-southeast1.firebasedatabase.app",
-        "project_id": "nandogami-45016",
-        "storage_bucket": "nandogami-45016.firebasestorage.app"
-    },
-    "client": [{
-        "client_info": {
-            "mobilesdk_app_id": "1:190535714842:android:3ec9b1b47eea08837be9a3",
-            "android_client_info": {
-                "package_name": "com.example.nandogami"
-            }
-        },
-        "oauth_client": [],
-        "api_key": [{
-            "current_key": "AIzaSyDMGiYIV4XL6y5d8VtpER5lswpSfPxE6JQ"
-        }],
-        "services": {
-            "appinvite_service": {
-                "other_platform_oauth_client": []
-            }
+  "project_info": {
+    "project_number": "190535714842",
+    "firebase_url": "https://nandogami-45016-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "nandogami-45016",
+    "storage_bucket": "nandogami-45016.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:190535714842:android:f0d439c217a03b9c7be9a3",
+        "android_client_info": {
+          "package_name": "com.coment"
         }
-    }],
-    "configuration_version": "1"
+      },
+      "oauth_client": [
+        {
+          "client_id": "190535714842-ckno1un0jfv8en8rqnl1lqcobdcok3bu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.coment",
+            "certificate_hash": "166d969ec3a1ae266f44b2c92bde5d954390bb54"
+          }
+        },
+        {
+          "client_id": "190535714842-r7aild11v8rd12bnrud9919tek9hj9u3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDuyGRBkDUsiSsBEuMWPF7IE7uCOYs4lCU"
+        },
+        {
+          "current_key": "AIzaSyDMGiYIV4XL6y5d8VtpER5lswpSfPxE6JQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "190535714842-r7aild11v8rd12bnrud9919tek9hj9u3.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "190535714842-kmug0vgjfc3abtns33hntu54sp9tq5f4.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.nandogamiFlutter"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:190535714842:android:3ec9b1b47eea08837be9a3",
+        "android_client_info": {
+          "package_name": "com.example.nandogami"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "190535714842-dr3me2o5l0ppc9m5blm4l76ar1u37n00.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.nandogami",
+            "certificate_hash": "166d969ec3a1ae266f44b2c92bde5d954390bb54"
+          }
+        },
+        {
+          "client_id": "190535714842-j1uk8o85skb9eods1ba41ga8mpcnnikj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.nandogami",
+            "certificate_hash": "27d8ed9f2c5f268400b13173c90c6ca3d0a7619e"
+          }
+        },
+        {
+          "client_id": "190535714842-m91l38nriqq13m87ak0hqt8ljlq3bs9h.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.nandogami",
+            "certificate_hash": "af9808ad8d9c024e460d9c6f988ab9d426b3fc87"
+          }
+        },
+        {
+          "client_id": "190535714842-s0l0mdgrfhlhfr879p8q17lulgve17a8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.nandogami",
+            "certificate_hash": "a829cae8e82045c4c8f50ee42c3ac78749cd2251"
+          }
+        },
+        {
+          "client_id": "190535714842-ttd6rf66gpvldgko84be40sacjkjm26j.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.nandogami",
+            "certificate_hash": "dfee01992e8026acbd8840d14eb602b0981ca3a2"
+          }
+        },
+        {
+          "client_id": "190535714842-r7aild11v8rd12bnrud9919tek9hj9u3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDuyGRBkDUsiSsBEuMWPF7IE7uCOYs4lCU"
+        },
+        {
+          "current_key": "AIzaSyDMGiYIV4XL6y5d8VtpER5lswpSfPxE6JQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "190535714842-r7aild11v8rd12bnrud9919tek9hj9u3.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "190535714842-kmug0vgjfc3abtns33hntu54sp9tq5f4.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.nandogamiFlutter"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
 }

@@ -822,34 +822,39 @@ class _AboutTabNewState extends State<AboutTabNew> {
   }
 
   Future<void> _loadCharacters() async {
+    if (!mounted) return;
+    
     setState(() {
       _loadingCharacters = true;
     });
 
     try {
-      // Import SimpleAniListService to fetch characters
       final mangaService = SimpleAniListService();
       final mangaId = int.tryParse(widget.item.id);
       
       if (mangaId != null) {
-        // Fetch characters using a separate query
         final characters = await mangaService.getMangaCharacters(mangaId);
-        setState(() {
-          _characters = characters;
-          _loadingCharacters = false;
-        });
+        if (mounted) {
+          setState(() {
+            _characters = characters;
+            _loadingCharacters = false;
+          });
+        }
       } else {
+        if (mounted) {
+          setState(() {
+            _characters = [];
+            _loadingCharacters = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
           _characters = [];
           _loadingCharacters = false;
         });
       }
-    } catch (e) {
-      debugPrint('Error loading characters: $e');
-      setState(() {
-        _characters = [];
-        _loadingCharacters = false;
-      });
     }
   }
 

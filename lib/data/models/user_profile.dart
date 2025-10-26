@@ -6,6 +6,7 @@ class UserProfile {
   final String? bio;
   final String? photoUrl;
   final DateTime? joinedAt;
+  final DateTime? lastSeen;
 
   const UserProfile({
     required this.id,
@@ -15,6 +16,7 @@ class UserProfile {
     this.bio,
     this.photoUrl,
     this.joinedAt,
+    this.lastSeen,
   });
 
   factory UserProfile.fromMap(String id, Map<String, dynamic> data) {
@@ -23,6 +25,13 @@ class UserProfile {
     if (joined is num) {
       joinedAt = DateTime.fromMillisecondsSinceEpoch(joined.toInt());
     }
+    
+    final lastSeenData = data['lastSeen'];
+    DateTime? lastSeen;
+    if (lastSeenData is num) {
+      lastSeen = DateTime.fromMillisecondsSinceEpoch(lastSeenData.toInt());
+    }
+    
     return UserProfile(
       id: id,
       username: data['username'] as String?,
@@ -31,6 +40,7 @@ class UserProfile {
       bio: data['bio'] as String?,
       photoUrl: data['photoUrl'] as String?,
       joinedAt: joinedAt,
+      lastSeen: lastSeen,
     );
   }
 }

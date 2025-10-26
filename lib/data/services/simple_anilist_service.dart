@@ -366,8 +366,6 @@ class SimpleAniListService {
     // Retry mechanism
     for (int attempt = 1; attempt <= 3; attempt++) {
       try {
-        debugPrint('AniList API attempt $attempt/3');
-        
         final response = await http.post(
           Uri.parse(_baseUrl),
           headers: {
@@ -389,7 +387,6 @@ class SimpleAniListService {
           }
           
           final media = jsonData['data']?['Page']?['media'] as List<dynamic>? ?? [];
-          debugPrint('AniList API success: ${media.length} items');
           return media.map((item) => Manga.fromJson(item)).toList();
         } else if (response.statusCode == 429) {
           // Rate limited
@@ -576,11 +573,7 @@ class SimpleAniListService {
         
         final media = data['data']?['Media'];
         if (media != null) {
-          debugPrint('Successfully parsed manga data');
-          debugPrint('External links data: ${media['externalLinks']}');
           return Manga.fromJson(media);
-        } else {
-          debugPrint('No media data found in response');
         }
       } else {
         debugPrint('HTTP error: ${response.statusCode} - ${response.body}');
@@ -596,7 +589,6 @@ class SimpleAniListService {
   Future<List<ExternalLink>> getMangaExternalLinks(int id) async {
     // Check cache first - use cache if available (even if empty, to avoid repeated API calls)
     if (_externalLinksCache.containsKey(id)) {
-      debugPrint('Using cached external links for manga ID: $id (${_externalLinksCache[id]!.length} links)');
       return _externalLinksCache[id]!;
     }
 
@@ -625,30 +617,25 @@ class SimpleAniListService {
       }
       _lastRequestTime = DateTime.now();
 
-      debugPrint('Fetching external links for manga ID: $id');
       final response = await http.post(
         Uri.parse(_baseUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'query': query}),
       );
-
-      debugPrint('External links response status: ${response.statusCode}');
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         
         if (data['errors'] != null) {
           debugPrint('GraphQL errors for external links: ${data['errors']}');
-          // Don't cache error responses, return empty list
           return [];
         }
         
         final media = data['data']?['Media'];
         if (media != null) {
           final links = media['externalLinks'] as List<dynamic>? ?? [];
-          debugPrint('Found ${links.length} external links from AniList');
           final externalLinks = links.map((link) => ExternalLink.fromJson(link)).toList();
-          _externalLinksCache[id] = externalLinks; // Cache all results, even empty ones
+          _externalLinksCache[id] = externalLinks;
           return externalLinks;
         }
       } else if (response.statusCode == 429) {
@@ -686,7 +673,6 @@ class SimpleAniListService {
   Future<List<ExternalLink>> getMangaExternalLinksWithRetry(int id, {int maxRetries = 2}) async {
     // Check cache first - if already cached, return immediately
     if (_externalLinksCache.containsKey(id)) {
-      debugPrint('Using cached external links for manga ID: $id (${_externalLinksCache[id]!.length} links)');
       return _externalLinksCache[id]!;
     }
     
@@ -699,7 +685,6 @@ class SimpleAniListService {
         
         // If no links found and not the last attempt, wait before retry
         if (attempt < maxRetries - 1) {
-          debugPrint('No external links found for manga ID: $id, retrying in 2 seconds...');
           await Future.delayed(const Duration(seconds: 2));
         }
       } catch (e) {
@@ -739,7 +724,6 @@ class SimpleAniListService {
     ''';
 
     try {
-      debugPrint('Fetching characters for manga ID: $id');
       final response = await http.post(
         Uri.parse(_baseUrl),
         headers: {'Content-Type': 'application/json'},
@@ -748,36 +732,19 @@ class SimpleAniListService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        debugPrint('Characters response data: $data');
-        
         if (data['errors'] != null) {
-          debugPrint('GraphQL errors for characters: ${data['errors']}');
           return [];
         }
         
         final media = data['data']?['Media'];
-        debugPrint('Media data for characters: $media');
-        
         if (media != null) {
           final charactersData = media['characters'];
-          debugPrint('Characters data: $charactersData');
-          
           if (charactersData != null) {
             final edges = charactersData['edges'] as List?;
-            debugPrint('Characters edges: $edges');
-            
             if (edges != null && edges.isNotEmpty) {
-              final characters = edges.map((edge) => MangaCharacter.fromJson(edge)).toList();
-              debugPrint('Parsed characters: ${characters.length} items');
-              return characters;
-            } else {
-              debugPrint('No characters edges found');
+              return edges.map((edge) => MangaCharacter.fromJson(edge)).toList();
             }
-          } else {
-            debugPrint('No characters data in media');
           }
-        } else {
-          debugPrint('No media data found for characters');
         }
       } else {
         debugPrint('HTTP error for characters: ${response.statusCode} - ${response.body}');
@@ -818,7 +785,6 @@ class SimpleAniListService {
     ''';
 
     try {
-      debugPrint('Fetching relations for manga ID: $id');
       final response = await http.post(
         Uri.parse(_baseUrl),
         headers: {'Content-Type': 'application/json'},
@@ -827,36 +793,19 @@ class SimpleAniListService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        debugPrint('Relations response data: $data');
-        
         if (data['errors'] != null) {
-          debugPrint('GraphQL errors for relations: ${data['errors']}');
           return [];
         }
         
         final media = data['data']?['Media'];
-        debugPrint('Media data for relations: $media');
-        
         if (media != null) {
           final relationsData = media['relations'];
-          debugPrint('Relations data: $relationsData');
-          
           if (relationsData != null) {
             final edges = relationsData['edges'] as List?;
-            debugPrint('Relations edges: $edges');
-            
             if (edges != null && edges.isNotEmpty) {
-              final relations = edges.map((edge) => MangaRelation.fromJson(edge)).toList();
-              debugPrint('Parsed relations: ${relations.length} items');
-              return relations;
-            } else {
-              debugPrint('No relations edges found');
+              return edges.map((edge) => MangaRelation.fromJson(edge)).toList();
             }
-          } else {
-            debugPrint('No relations data in media');
           }
-        } else {
-          debugPrint('No media data found');
         }
       } else {
         debugPrint('HTTP error for relations: ${response.statusCode} - ${response.body}');
@@ -925,7 +874,6 @@ class SimpleAniListService {
     ''';
 
     try {
-      debugPrint('Fetching recommendations for manga ID: $id');
       final response = await http.post(
         Uri.parse(_baseUrl),
         headers: {'Content-Type': 'application/json'},
@@ -934,40 +882,23 @@ class SimpleAniListService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        debugPrint('Recommendations response data: $data');
-        
         if (data['errors'] != null) {
-          debugPrint('GraphQL errors for recommendations: ${data['errors']}');
           return [];
         }
         
         final media = data['data']?['Media'];
-        debugPrint('Media data for recommendations: $media');
-        
         if (media != null) {
           final recommendationsData = media['recommendations'];
-          debugPrint('Recommendations data: $recommendationsData');
-          
           if (recommendationsData != null) {
             final edges = recommendationsData['edges'] as List?;
-            debugPrint('Recommendations edges: $edges');
-            
             if (edges != null && edges.isNotEmpty) {
-              final recommendations = edges
+              return edges
                   .map((edge) => edge['node']['mediaRecommendation'])
                   .where((rec) => rec != null)
                   .map((rec) => Manga.fromJson(rec))
                   .toList();
-              debugPrint('Parsed recommendations: ${recommendations.length} items');
-              return recommendations;
-            } else {
-              debugPrint('No recommendations edges found');
             }
-          } else {
-            debugPrint('No recommendations data in media');
           }
-        } else {
-          debugPrint('No media data found for recommendations');
         }
       } else {
         debugPrint('HTTP error for recommendations: ${response.statusCode} - ${response.body}');

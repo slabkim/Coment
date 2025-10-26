@@ -29,10 +29,6 @@ class ProfileScreen extends StatelessWidget {
         final user = authSnapshot.data;
         final uid = user?.uid;
         
-        // Debug log
-        debugPrint('ProfileScreen - Auth state changed: ${user?.uid}');
-        debugPrint('ProfileScreen - Current user: $user');
-        
         return Scaffold(
           appBar: AppBar(
             title: const Text('Profile'),

@@ -1,5 +1,6 @@
 const admin = require('firebase-admin');
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onRequest } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
 admin.initializeApp();
 setGlobalOptions({ region: 'us-central1', memoryMiB: 256, timeoutSeconds: 60 });
@@ -15,6 +16,9 @@ async function sendToUser(uid, payload) {
   const tokens = Array.from(tokensSet);
   if (tokens.length === 0) return;
 
+  // HYBRID: Send both notification + data payload
+  // - notification: shown by system when app terminated
+  // - data: used for navigation when tapped
   const message = {
     tokens,
     notification: payload.notification,
@@ -24,6 +28,14 @@ async function sendToUser(uid, payload) {
       notification: {
         channelId: 'chat_channel',
         clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+        tag: payload.data?.chatId || 'default',
+      },
+    },
+    apns: {
+      payload: {
+        aps: {
+          sound: 'default',
+        },
       },
     },
   };
@@ -35,6 +47,7 @@ async function sendToUser(uid, payload) {
       notification: message.notification,
       data: message.data,
       android: message.android,
+      apns: message.apns,
     });
   } else {
     const res = await admin.messaging().sendEachForMulticast
@@ -71,11 +84,24 @@ exports.onChatMessageCreate = onDocumentCreated('chat_messages/{messageId}', asy
   if (!chat.exists) return;
   const participants = chat.get('participants') || [];
   const senderName = chat.get('lastMessageSenderName') || 'Someone';
-  const body = m.text ? m.text : (m.imageUrl ? 'Sent an image' : 'New message');
+  
+  // Determine message body based on content
+  let body;
+  if (m.text) {
+    body = m.text;
+  } else if (m.imageUrl) {
+    // Check if it's a GIF (Giphy URLs contain 'giphy')
+    const isGif = m.imageUrl.includes('giphy') || m.imageUrl.includes('.gif');
+    body = isGif ? 'Sent a GIF 🎬' : 'Sent an image 📷';
+  } else {
+    body = 'New message';
+  }
+  
   const targets = participants.filter((p) => p !== m.senderId);
   await Promise.all(targets.map((uid) => sendToUser(uid, {
     notification: { title: `Pesan baru dari ${senderName}`, body },
     data: { type: 'dm', chatId: m.chatId, senderId: m.senderId, senderName },
+    tag: m.chatId, // Group notifications by chat
   })));
 });
 
@@ -107,4 +133,37 @@ exports.onFollowCreate = onDocumentCreated('follows/{followId}', async (event) =
   });
 });
 
+// Backfill lastSeen for all users (call this once via HTTP)
+exports.backfillLastSeen = onRequest(async (req, res) => {
+  try {
+    const usersSnapshot = await admin.firestore().collection('users').get();
+    const batch = admin.firestore().batch();
+    const now = Date.now();
+    let count = 0;
 
+    usersSnapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      // Only update if lastSeen doesn't exist
+      if (!data.lastSeen) {
+        batch.set(doc.ref, { lastSeen: now }, { merge: true });
+        count++;
+      }
+    });
+
+    if (count > 0) {
+      await batch.commit();
+    }
+
+    res.json({ 
+      success: true, 
+      message: `Updated ${count} users with lastSeen field`,
+      timestamp: now
+    });
+  } catch (error) {
+    console.error('Error backfilling lastSeen:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});

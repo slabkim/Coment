@@ -10,6 +10,7 @@ import '../../data/services/chat_service.dart';
 import '../../data/services/giphy_service.dart';
 import '../../data/services/user_service.dart';
 import 'chat_list_screen.dart';
+import 'user_public_profile_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String peerUserId;
@@ -48,6 +49,11 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _loadSelfProfile();
+    // Update lastSeen when entering chat
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      _userService.updateLastSeen(uid);
+    }
   }
 
   @override
@@ -63,36 +69,64 @@ class _ChatScreenState extends State<ChatScreen> {
             final profile = snapshot.data;
             final name = profile?.username ?? widget.peerDisplayName;
             final photo = profile?.photoUrl ?? widget.peerPhotoUrl;
-            return Row(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.primaryContainer,
-                  backgroundImage: (photo != null && photo.isNotEmpty)
-                      ? NetworkImage(photo)
-                      : null,
-                  child: (photo == null || photo.isEmpty)
-                      ? Text(
-                          _initials(name),
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onPrimaryContainer,
-                          ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            // Use joinedAt as fallback if lastSeen not available
+            final lastSeen = profile?.lastSeen ?? profile?.joinedAt;
+            final onlineStatus = _getOnlineStatus(lastSeen);
+            
+            return GestureDetector(
+              onTap: () => _navigateToProfile(widget.peerUserId),
+              behavior: HitTestBehavior.opaque,
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer,
+                    backgroundImage: (photo != null && photo.isNotEmpty)
+                        ? NetworkImage(photo)
+                        : null,
+                    child: (photo == null || photo.isEmpty)
+                        ? Text(
+                            _initials(name),
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onPrimaryContainer,
+                            ),
+                          )
+                        : null,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          onlineStatus,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: onlineStatus == 'Online'
+                                ? Colors.greenAccent
+                                : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         ),
@@ -157,59 +191,78 @@ class _ChatScreenState extends State<ChatScreen> {
                                     alignment: isMe
                                         ? Alignment.centerRight
                                         : Alignment.centerLeft,
-                                    child: Row(
-                                      // Keep row compact but make sure the bubble
-                                      // doesn't exceed available width
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
+                                    child: Column(
+                                      crossAxisAlignment: isMe
+                                          ? CrossAxisAlignment.end
+                                          : CrossAxisAlignment.start,
                                       children: [
-                                        if (!isMe)
-                                          const SizedBox(width: 0)
-                                        else
-                                          const SizedBox(width: 0),
-                                        // Constrain the bubble max width so long
-                                        // texts wrap and do not overflow with the
-                                        // trailing status icon.
-                                        Flexible(
-                                          child: ConstrainedBox(
-                                            constraints: BoxConstraints(
-                                              // Keep an upper bound for very wide screens,
-                                              // but allow the bubble to shrink as needed.
-                                              maxWidth: MediaQuery.of(context).size.width * 0.72,
-                                            ),
-                                            child: Container(
-                                              margin: const EdgeInsets.symmetric(
-                                                vertical: 4,
-                                              ),
-                                              padding: const EdgeInsets.symmetric(
-                                                vertical: 8,
-                                                horizontal: 12,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: isMe
-                                                    ? const Color(0xFF3B2A58)
-                                                    : const Color(0xFF1E232B),
-                                                borderRadius: BorderRadius.circular(
-                                                  12,
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.end,
+                                          children: [
+                                            if (!isMe)
+                                              const SizedBox(width: 0)
+                                            else
+                                              const SizedBox(width: 0),
+                                            // Constrain the bubble max width
+                                            Flexible(
+                                              child: ConstrainedBox(
+                                                constraints: BoxConstraints(
+                                                  maxWidth: MediaQuery.of(context).size.width * 0.72,
+                                                ),
+                                                child: Container(
+                                                  margin: const EdgeInsets.symmetric(
+                                                    vertical: 2,
+                                                  ),
+                                                  padding: const EdgeInsets.symmetric(
+                                                    vertical: 8,
+                                                    horizontal: 12,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: isMe
+                                                        ? const Color(0xFF3B2A58)
+                                                        : const Color(0xFF1E232B),
+                                                    borderRadius: BorderRadius.circular(
+                                                      12,
+                                                    ),
+                                                  ),
+                                                  child: content,
                                                 ),
                                               ),
-                                              child: content,
+                                            ),
+                                            if (isMe) ...[
+                                              const SizedBox(width: 6),
+                                              Icon(
+                                                isRead
+                                                    ? Icons.done_all
+                                                    : Icons.check,
+                                                size: 16,
+                                                color: isRead
+                                                    ? const Color(0xFF4FC3F7)  // Bright blue for read
+                                                    : Colors.grey.shade400,    // Grey for sent
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        // Timestamp below message bubble
+                                        Padding(
+                                          padding: EdgeInsets.only(
+                                            left: isMe ? 0 : 12,
+                                            right: isMe ? 12 : 0,
+                                            top: 2,
+                                            bottom: 4,
+                                          ),
+                                          child: Text(
+                                            _formatMessageTime(m.createdAt),
+                                            style: TextStyle(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                              fontSize: 10,
                                             ),
                                           ),
                                         ),
-                                        if (isMe) ...[
-                                          const SizedBox(width: 6),
-                                          Icon(
-                                            isRead
-                                                ? Icons.done_all
-                                                : Icons.check,
-                                            size: 16,
-                                            color: isRead
-                                                ? Colors.lightBlueAccent
-                                                : Colors.white54,
-                                          ),
-                                        ],
                                       ],
                                     ),
                                   );
@@ -363,6 +416,43 @@ class _ChatScreenState extends State<ChatScreen> {
           profile?.username ?? user.displayName ?? user.email?.split('@').first;
     });
   }
+  
+  void _navigateToProfile(String userId) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => UserPublicProfileScreen(userId: userId),
+      ),
+    );
+  }
+}
+
+String _formatMessageTime(DateTime time) {
+  final now = DateTime.now();
+  final diff = now.difference(time);
+  
+  // If message is from today, show time only
+  if (diff.inDays == 0 && now.day == time.day) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+  
+  // If message is from yesterday
+  if (diff.inDays == 1 || (diff.inHours >= 24 && now.day - time.day == 1)) {
+    return 'Yesterday';
+  }
+  
+  // If message is within this week, show day name
+  if (diff.inDays < 7) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return days[time.weekday - 1];
+  }
+  
+  // Otherwise show date
+  final day = time.day.toString().padLeft(2, '0');
+  final month = time.month.toString().padLeft(2, '0');
+  final year = time.year.toString().substring(2);
+  return '$day/$month/$year';
 }
 
 String _initials(String name) {
@@ -372,6 +462,44 @@ String _initials(String name) {
       : 'U';
   final second = parts.length > 1 && parts.last.isNotEmpty ? parts.last[0] : '';
   return (first + second).toUpperCase();
+}
+
+String _getOnlineStatus(DateTime? lastSeen) {
+  if (lastSeen == null) {
+    return 'Status tidak tersedia';
+  }
+  
+  final now = DateTime.now();
+  final diff = now.difference(lastSeen);
+  
+  // If last seen within 3 minutes, consider online
+  if (diff.inMinutes < 3) {
+    return 'Online';
+  }
+  
+  // If less than 1 hour
+  if (diff.inMinutes < 60) {
+    final mins = diff.inMinutes;
+    return 'Terakhir online $mins menit yang lalu';
+  }
+  
+  // If less than 24 hours
+  if (diff.inHours < 24) {
+    final hours = diff.inHours;
+    return 'Terakhir online $hours jam yang lalu';
+  }
+  
+  // If less than 7 days
+  if (diff.inDays < 7) {
+    final days = diff.inDays;
+    return 'Terakhir online $days hari yang lalu';
+  }
+  
+  // Otherwise show date
+  final day = lastSeen.day.toString().padLeft(2, '0');
+  final month = lastSeen.month.toString().padLeft(2, '0');
+  final year = lastSeen.year;
+  return 'Terakhir online $day/$month/$year';
 }
 
 class _GifPicker extends StatefulWidget {
