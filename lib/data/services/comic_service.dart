@@ -204,30 +204,34 @@ class ComicService {
       
       // Convert Manga to ComicItem and apply content filtering
       return {
-        'featured': mixedFeed['featured']!
+        'featured': (mixedFeed['featured'] ?? [])
             .where((manga) => _isContentSafe(manga))
             .map((manga) => ComicItem.fromManga(manga))
             .toList(),
-        'popular': mixedFeed['popular']!
+        'popular': (mixedFeed['popular'] ?? [])
             .where((manga) => _isContentSafe(manga))
             .map((manga) => ComicItem.fromManga(manga))
             .toList(),
-        'newReleases': mixedFeed['newReleases']!
+        'newReleases': (mixedFeed['newReleases'] ?? [])
             .where((manga) => _isContentSafe(manga))
             .map((manga) => ComicItem.fromManga(manga))
             .toList(),
-        'categories': mixedFeed['topRated']!
+        'topRated': (mixedFeed['topRated'] ?? [])
             .where((manga) => _isContentSafe(manga))
             .map((manga) => ComicItem.fromManga(manga))
             .toList(),
-        'seasonal': mixedFeed['seasonal']!
+        'trending': (mixedFeed['trending'] ?? [])
+            .where((manga) => _isContentSafe(manga))
+            .map((manga) => ComicItem.fromManga(manga))
+            .toList(),
+        'completed': (mixedFeed['completed'] ?? [])
             .where((manga) => _isContentSafe(manga))
             .map((manga) => ComicItem.fromManga(manga))
             .toList(),
       };
     } catch (e) {
       // Fallback to minimal data
-      print('AniList API failed, using minimal fallback: $e');
+      debugPrint('AniList API failed, using minimal fallback: $e');
       return _getMinimalFallback();
     }
   }
@@ -238,8 +242,9 @@ class ComicService {
       'featured': _getMinimalManga(2),
       'popular': _getMinimalManga(2),
       'newReleases': _getMinimalManga(2),
-      'categories': _getMinimalManga(2),
-      'seasonal': _getMinimalManga(2),
+      'topRated': _getMinimalManga(2),
+      'trending': _getMinimalManga(2),
+      'completed': _getMinimalManga(2),
     };
   }
 

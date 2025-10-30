@@ -53,9 +53,7 @@ class ComicDetailHeader extends StatelessWidget {
                 placeholder: (context, url) => Container(
                   color: AppColors.grayDark,
                   child: const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.purpleAccent,
-                    ),
+                    child: CircularProgressIndicator(),
                   ),
                 ),
                 errorWidget: (context, url, error) => Container(
@@ -119,9 +117,7 @@ class ComicDetailHeader extends StatelessWidget {
                     placeholder: (context, url) => Container(
                       color: AppColors.grayDark,
                       child: const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.purpleAccent,
-                        ),
+                        child: CircularProgressIndicator(),
                       ),
                     ),
                     errorWidget: (context, url, error) => Container(

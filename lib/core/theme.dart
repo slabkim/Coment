@@ -48,6 +48,9 @@ class NandogamiTheme {
         selectedItemColor: AppColors.purpleAccent,
         unselectedItemColor: AppColors.whiteSecondary,
       ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: AppColors.purpleAccent, // Purple for all loading indicators in dark mode
+      ),
     );
   }
 
@@ -168,6 +171,9 @@ class NandogamiTheme {
         textColor: Color(0xFF0F172A), // Slate 900 - hitam pekat
         iconColor: Color(0xFF475569), // Slate 600 - abu-abu gelap
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: Color(0xFF3B82F6), // Blue for all loading indicators in light mode
       ),
     );
   }

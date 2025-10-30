@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants.dart';
@@ -21,6 +22,7 @@ class _SearchScreenState extends State<SearchScreen> {
   final _c = TextEditingController();
   final _svc = SearchService();
   List<String> _recent = const [];
+  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -35,8 +37,23 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _c.dispose();
     super.dispose();
+  }
+  
+  void _onSearchChanged(String value) {
+    // Cancel previous timer
+    _debounceTimer?.cancel();
+    
+    // Update UI immediately for clear button
+    setState(() {});
+    
+    // Debounce search API call
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      final prov = Provider.of<ItemProvider>(context, listen: false);
+      prov.search(value);
+    });
   }
 
   @override
@@ -83,6 +100,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         size: 20,
                       ),
                       onPressed: () {
+                        _debounceTimer?.cancel();
                         _c.clear();
                         prov.search('');
                         setState(() {});
@@ -90,11 +108,12 @@ class _SearchScreenState extends State<SearchScreen> {
                     )
                   : null,
             ),
-            onChanged: (value) {
-              setState(() {});
-              prov.search(value);
-            },
+            onChanged: _onSearchChanged,
             onSubmitted: (v) async {
+              // Cancel debounce and search immediately on submit
+              _debounceTimer?.cancel();
+              final prov = Provider.of<ItemProvider>(context, listen: false);
+              prov.search(v);
               await _svc.pushRecent(v);
               _loadRecent();
             },
@@ -244,14 +263,73 @@ class _SearchResults extends StatelessWidget {
   Widget build(BuildContext context) {
     final prov = context.watch<ItemProvider>();
     final items = prov.items;
-    if (items.isEmpty) {
+    final isLoading = prov.isLoading;
+    
+    // Show loading animation while searching
+    if (isLoading) {
       return Center(
-        child: Text(
-          'No results',
-          style: Theme.of(context).textTheme.bodyMedium,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(
+              strokeWidth: 3,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Searching...',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Please wait',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
         ),
       );
     }
+    
+    // Show empty state only after loading is done
+    if (items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              size: 80,
+              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No results found',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 48),
+              child: Text(
+                'Try different keywords or check your spelling',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Show results
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
@@ -266,6 +344,15 @@ class _SearchResults extends StatelessWidget {
               width: 56,
               height: 56,
               fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 56,
+                height: 56,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: Icon(
+                  Icons.broken_image,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
             ),
           ),
           title: Text(
@@ -303,15 +390,73 @@ class _UserResults extends StatelessWidget {
     return StreamBuilder<List<UserProfile>>(
       stream: userSvc.searchUsers(query),
       builder: (context, snapshot) {
-        final users = snapshot.data ?? const [];
-        if (users.isEmpty) {
+        // Show loading animation while searching users
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(
-            child: Text(
-              'No users found',
-              style: Theme.of(context).textTheme.bodyMedium,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(
+                  strokeWidth: 3,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Searching users...',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Please wait',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
             ),
           );
         }
+        
+        final users = snapshot.data ?? const [];
+        
+        // Show empty state only after loading is done
+        if (users.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.person_search,
+                  size: 80,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No users found',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 48),
+                  child: Text(
+                    'Try searching with @username or @handle',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        
+        // Show user results
         return ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: users.length,
@@ -320,16 +465,19 @@ class _UserResults extends StatelessWidget {
             final u = users[i];
             return ListTile(
               leading: CircleAvatar(
+                backgroundColor: AppColors.purpleAccent.withValues(alpha: 0.2),
                 backgroundImage: (u.photoUrl != null && u.photoUrl!.isNotEmpty)
                     ? NetworkImage(u.photoUrl!)
                     : null,
                 child: (u.photoUrl == null || u.photoUrl!.isEmpty)
-                    ? const Icon(Icons.person)
+                    ? Icon(Icons.person, color: AppColors.purpleAccent)
                     : null,
               ),
               title: Text(
                 u.username ?? u.handle ?? 'User',
-                style: Theme.of(context).textTheme.bodyLarge,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               subtitle: Text(
                 (u.handle ?? u.email ?? ''),

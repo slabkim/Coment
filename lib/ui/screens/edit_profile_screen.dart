@@ -21,7 +21,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _bioC = TextEditingController();
   bool _saving = false;
   XFile? _picked;
+  XFile? _pickedCover;
   String? _currentPhoto;
+  String? _currentCoverPhoto;
   bool _loadingInitial = true;
 
   @override
@@ -78,35 +80,101 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Cover Photo
             GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                ),
-                child: _avatarPreview(),
+              onTap: _pickCoverImage,
+              child: Stack(
+                children: [
+                  Container(
+                    height: 180,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                    ),
+                    child: _coverPhotoPreview(),
+                  ),
+                  Positioned(
+                    right: 16,
+                    bottom: 16,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _nameC,
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-              decoration: _decoration('Display name'),
+            
+            // Profile Photo (overlapping cover)
+            Transform.translate(
+              offset: const Offset(0, -40),
+              child: Center(
+                child: GestureDetector(
+                  onTap: _pickImage,
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 96,
+                        height: 96,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          border: Border.all(
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                            width: 4,
+                          ),
+                        ),
+                        child: _avatarPreview(),
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Theme.of(context).scaffoldBackgroundColor,
+                              width: 2,
+                            ),
+                          ),
+                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _bioC,
-              minLines: 3,
-              maxLines: 5,
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-              decoration: _decoration('Bio'),
+            
+            // Form fields
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _nameC,
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                    decoration: _decoration('Display name'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _bioC,
+                    minLines: 3,
+                    maxLines: 5,
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                    decoration: _decoration('Bio'),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -127,11 +195,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   );
 
   Future<void> _save() async {
-    print('_save method called'); // Debug log
     setState(() => _saving = true);
     try {
       final user = FirebaseAuth.instance.currentUser;
-      print('Current user: ${user?.uid}'); // Debug log
       if (user == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -146,9 +212,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       final newName = _nameC.text.trim();
       final newBio = _bioC.text.trim();
-      
-      print('New name: $newName'); // Debug log
-      print('New bio: $newBio'); // Debug log
 
       // Validate input
       if (newName.isEmpty) {
@@ -164,13 +227,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
 
       String? photoUrl;
+      String? coverPhotoUrl;
+      
+      // Upload profile photo
       if (_picked != null) {
         try {
-          print('Uploading image to Cloudinary...'); // Debug log
           photoUrl = await CloudinaryService.uploadImage(File(_picked!.path));
-          print('Image uploaded successfully: $photoUrl'); // Debug log
         } catch (e) {
-          print('Error uploading to Cloudinary: $e'); // Debug log
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -182,18 +245,41 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           return;
         }
       }
+      
+      // Upload cover photo
+      if (_pickedCover != null) {
+        try {
+          coverPhotoUrl = await CloudinaryService.uploadImage(File(_pickedCover!.path));
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error uploading cover photo: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      }
 
       // Update Firestore document
       try {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        final updates = {
           'username': newName,
           'bio': newBio,
           if (photoUrl != null) 'photoUrl': photoUrl,
+          if (coverPhotoUrl != null) 'coverPhotoUrl': coverPhotoUrl,
           'usernameLower': newName.toLowerCase(),
           'handle': newName.toLowerCase().replaceAll(' ', ''),
           'handleLower': newName.toLowerCase().replaceAll(' ', ''),
           'updatedAt': DateTime.now().millisecondsSinceEpoch,
-        }, SetOptions(merge: true));
+        };
+        
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set(
+          updates,
+          SetOptions(merge: true)
+        );
 
         // Update Firebase Auth profile
         if (photoUrl != null) {
@@ -242,6 +328,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (img != null) setState(() => _picked = img);
   }
 
+  Future<void> _pickCoverImage() async {
+    final img = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (img != null) setState(() => _pickedCover = img);
+  }
+
   Future<void> _loadProfile() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -253,6 +347,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameC.text = profile?.username ?? user.displayName ?? '';
     _bioC.text = profile?.bio ?? '';
     _currentPhoto = profile?.photoUrl;
+    _currentCoverPhoto = profile?.coverPhotoUrl;
     setState(() => _loadingInitial = false);
   }
 
@@ -267,4 +362,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
     return const Icon(Icons.camera_alt, color: Colors.white70);
   }
+
+  Widget _coverPhotoPreview() {
+    if (_pickedCover != null) {
+      return Image.file(
+        File(_pickedCover!.path),
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+      );
+    }
+    if (_currentCoverPhoto != null && _currentCoverPhoto!.isNotEmpty) {
+      return Image.network(
+        _currentCoverPhoto!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+      );
+    }
+    return Center(
+      child: Icon(
+        Icons.add_photo_alternate,
+        color: Theme.of(context).colorScheme.onPrimaryContainer,
+        size: 48,
+      ),
+    );
+  }
+
 }

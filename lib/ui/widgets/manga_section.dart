@@ -33,12 +33,16 @@ class MangaSection extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+              Flexible(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
                 ),
               ),
               if (onViewAll != null)
@@ -57,9 +61,7 @@ class MangaSection extends StatelessWidget {
           const Center(
             child: Padding(
               padding: EdgeInsets.all(32),
-              child: CircularProgressIndicator(
-                color: AppColors.purpleAccent,
-              ),
+              child: CircularProgressIndicator(),
             ),
           )
         else if (error != null)
@@ -132,9 +134,7 @@ class MangaSection extends StatelessWidget {
                   width: 140,
                   color: AppColors.grayDark,
                   child: const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.purpleAccent,
-                    ),
+                    child: CircularProgressIndicator(),
                   ),
                 ),
                 errorWidget: (context, url, error) => Container(

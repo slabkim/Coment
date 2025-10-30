@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Forum cover images - any authenticated user can upload/read
+    match /forum_covers/{forumId} {
+      allow read: if true; // Anyone can view forum covers
+      allow write: if request.auth != null; // Any logged-in user can upload
+      allow delete: if request.auth != null; // Any logged-in user can delete (for edit)
+    }
+    
+    // Forum message images - any authenticated user can upload/read
+    match /forum_message_images/{forumId}/{messageId} {
+      allow read: if true; // Anyone can view message images
+      allow write: if request.auth != null; // Any logged-in forum member can upload
+      allow delete: if request.auth != null; // Message owner or moderator can delete
+    }
+    
+    // Private chat images - authenticated users can upload/read
+    match /chat_images/{chatId}/{messageId} {
+      allow read: if true; // Anyone can view chat images (if they have the URL)
+      allow write: if request.auth != null; // Any logged-in user can upload
+      allow delete: if request.auth != null; // Message sender can delete
+    }
+    
+    // User profile pictures
+    match /profile_pictures/{userId} {
+      allow read: if true; // Anyone can view profile pictures
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Comic/manga covers (if needed)
+    match /comic_covers/{comicId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+    
+    // Default: deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

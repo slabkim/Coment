@@ -37,22 +37,43 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun handleNotificationIntent(intent: Intent) {
+        // Check if this is a notification click
+        val action = intent.action
+        android.util.Log.d("MainActivity", "Intent action: $action")
+        
+        // Only handle FLUTTER_NOTIFICATION_CLICK or notification extras
+        if (action != "FLUTTER_NOTIFICATION_CLICK" && 
+            intent.extras?.containsKey("type") != true) {
+            return
+        }
+        
         val notificationData = mutableMapOf<String, String>()
         
+        // Extract all FCM data payload
         intent.extras?.keySet()?.forEach { key ->
-            if (!key.startsWith("google.") && !key.startsWith("gcm.") && 
-                !key.startsWith("from") && key != "collapse_key") {
+            android.util.Log.d("MainActivity", "Intent extra key: $key")
+            // Skip system keys
+            if (!key.startsWith("google.") && 
+                !key.startsWith("gcm.") && 
+                !key.startsWith("from") && 
+                key != "collapse_key" &&
+                key != "androidx.contentpager.content.wakelockid") {
                 val value = intent.extras?.get(key)
                 if (value != null) {
                     notificationData[key] = value.toString()
+                    android.util.Log.d("MainActivity", "Added data: $key = $value")
                 }
             }
         }
         
+        android.util.Log.d("MainActivity", "Notification data size: ${notificationData.size}")
+        
         if (notificationData.isNotEmpty()) {
             if (methodChannel != null) {
+                android.util.Log.d("MainActivity", "Invoking method channel with data")
                 methodChannel?.invokeMethod("onNotificationTap", notificationData)
             } else {
+                android.util.Log.d("MainActivity", "Method channel not ready, storing pending data")
                 pendingNotificationData = notificationData
             }
         }

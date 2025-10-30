@@ -387,7 +387,7 @@ class _AboutTabNewState extends State<AboutTabNew> {
         const SizedBox(height: 12),
         if (_loadingCharacters)
           const Center(
-            child: CircularProgressIndicator(color: AppColors.purpleAccent),
+            child: CircularProgressIndicator(),
           )
         else if (_characters?.isNotEmpty == true)
           SizedBox(
@@ -543,7 +543,7 @@ class _AboutTabNewState extends State<AboutTabNew> {
         const SizedBox(height: 12),
         if (_loadingRelations)
           const Center(
-            child: CircularProgressIndicator(color: AppColors.purpleAccent),
+            child: CircularProgressIndicator(),
           )
         else if (_relations?.isNotEmpty == true)
           ..._relations!.take(5).map((relation) => GestureDetector(
@@ -591,7 +591,6 @@ class _AboutTabNewState extends State<AboutTabNew> {
                             color: AppColors.grayDark,
                             child: const Center(
                               child: CircularProgressIndicator(
-                                color: AppColors.purpleAccent,
                                 strokeWidth: 2,
                               ),
                             ),
@@ -779,7 +778,7 @@ class _AboutTabNewState extends State<AboutTabNew> {
         const SizedBox(height: 12),
         if (_loadingRecommendations)
           const Center(
-            child: CircularProgressIndicator(color: AppColors.purpleAccent),
+            child: CircularProgressIndicator(),
           )
         else if (_recommendations?.isNotEmpty == true)
           SizedBox(
@@ -812,7 +811,6 @@ class _AboutTabNewState extends State<AboutTabNew> {
                               color: AppColors.grayDark,
                               child: const Center(
                                 child: CircularProgressIndicator(
-                                  color: AppColors.purpleAccent,
                                   strokeWidth: 2,
                                 ),
                               ),

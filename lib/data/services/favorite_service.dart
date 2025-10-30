@@ -1,9 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'xp_service.dart';
 
 class FavoriteService {
   final FirebaseFirestore _db;
-  FavoriteService([FirebaseFirestore? db])
-    : _db = db ?? FirebaseFirestore.instance;
+  final XPService _xpService;
+  
+  FavoriteService([FirebaseFirestore? db, XPService? xpService])
+    : _db = db ?? FirebaseFirestore.instance,
+      _xpService = xpService ?? XPService();
 
   Stream<bool> isFavoriteStream({
     required String userId,
@@ -29,13 +33,21 @@ class FavoriteService {
         .limit(1)
         .get();
     if (q.docs.isNotEmpty) {
+      // Remove favorite
       await _db.collection('favorites').doc(q.docs.first.id).delete();
+      
+      // Award negative XP for removing favorite
+      await _xpService.penalizeRemoveFavorite(userId, titleId);
     } else {
+      // Add favorite
       await _db.collection('favorites').add({
         'userId': userId,
         'titleId': titleId,
         'createdAt': DateTime.now().millisecondsSinceEpoch,
       });
+      
+      // Award XP for adding favorite
+      await _xpService.awardAddFavorite(userId, titleId);
     }
   }
 

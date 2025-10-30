@@ -16,25 +16,36 @@ async function sendToUser(uid, payload) {
   const tokens = Array.from(tokensSet);
   if (tokens.length === 0) return;
 
+  // Ensure all data values are strings (required for Android intent extras)
+  const stringifiedData = {};
+  if (payload.data) {
+    Object.keys(payload.data).forEach(key => {
+      stringifiedData[key] = String(payload.data[key] || '');
+    });
+  }
+
   // HYBRID: Send both notification + data payload
   // - notification: shown by system when app terminated
-  // - data: used for navigation when tapped
+  // - data: used for navigation when tapped (must be strings)
   const message = {
     tokens,
     notification: payload.notification,
-    data: payload.data || {},
+    data: stringifiedData,
     android: {
       priority: 'high',
       notification: {
         channelId: 'chat_channel',
         clickAction: 'FLUTTER_NOTIFICATION_CLICK',
-        tag: payload.data?.chatId || 'default',
+        tag: stringifiedData.chatId || stringifiedData.forumId || 'default',
+        // Pass data to notification intent extras
+        sound: 'default',
       },
     },
     apns: {
       payload: {
         aps: {
           sound: 'default',
+          'mutable-content': 1,
         },
       },
     },
@@ -114,9 +125,17 @@ exports.onCommentLikeCreate = onDocumentCreated('comment_likes/{likeId}', async 
   if (!comment.exists) return;
   const owner = comment.get('userId');
   if (!owner || owner === like.userId) return;
+  
+  // Get titleId (itemId) from comment for navigation
+  const titleId = comment.get('titleId') || '';
+  
   await sendToUser(owner, {
     notification: { title: 'Someone liked your comment', body: 'Tap to view' },
-    data: { type: 'like', commentId: comment.id }
+    data: { 
+      type: 'like', 
+      commentId: comment.id,
+      itemId: titleId // Include itemId for navigation to detail screen
+    }
   });
 });
 
@@ -130,6 +149,46 @@ exports.onFollowCreate = onDocumentCreated('follows/{followId}', async (event) =
   await sendToUser(target, {
     notification: { title: 'New follower', body: 'You have a new follower' },
     data: { type: 'follow', followerId: f.followerId }
+  });
+});
+
+// New: Mention notification in forum
+exports.onMentionNotificationCreate = onDocumentCreated('notifications/{notificationId}', async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  const notif = snap.data();
+  if (!notif) return;
+  
+  // Only handle mention type notifications
+  if (notif.type !== 'mention') return;
+  
+  const recipientUid = notif.recipientUid;
+  const senderName = notif.senderName || 'Someone';
+  const forumName = notif.forumName || 'a forum';
+  const message = notif.message || '';
+  const forumId = notif.forumId;
+  
+  if (!recipientUid) return;
+  
+  // Send FCM notification
+  await sendToUser(recipientUid, {
+    notification: { 
+      title: `${senderName} mentioned you in ${forumName}`, 
+      body: message 
+    },
+    data: { 
+      type: 'mention', 
+      forumId: forumId,
+      senderUid: notif.senderUid,
+      senderName: senderName,
+      forumName: forumName
+    }
+  });
+  
+  // Mark notification as sent
+  await admin.firestore().collection('notifications').doc(snap.id).update({
+    sent: true,
+    sentAt: admin.firestore.FieldValue.serverTimestamp()
   });
 });
 

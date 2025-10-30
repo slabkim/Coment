@@ -8,9 +8,14 @@ class SimpleAniListService {
   static const String _baseUrl = 'https://graphql.anilist.co';
   static const int _perPage = 20; // Increased for better data loading
   
-  // Rate limiting
+  // Rate limiting (increased to avoid 429 errors)
   static DateTime? _lastRequestTime;
-  static const Duration _minRequestInterval = Duration(milliseconds: 2000); // 2 seconds between requests to avoid rate limiting
+  static const Duration _minRequestInterval = Duration(milliseconds: 4000); // 4 seconds between requests to avoid rate limiting
+  
+  // Cache for genre queries to reduce API calls
+  static final Map<String, List<Manga>> _genreCache = {};
+  static final Map<String, DateTime> _genreCacheTime = {};
+  static const Duration _genreCacheDuration = Duration(minutes: 15); // Cache for 15 minutes
   
   // Cache for external links to reduce API calls
   static final Map<int, List<ExternalLink>> _externalLinksCache = {};
@@ -366,25 +371,68 @@ class SimpleAniListService {
     return _executeQuery(query);
   }
 
-  /// Categories - berdasarkan genre
+  /// Categories - berdasarkan genre/tag (ALL comic types: manga, manhwa, manhua, etc.)
   Future<List<Manga>> getMangaByGenres(List<String> genres) async {
-    final genreString = genres.map((g) => '"$g"').join(',');
+    // Limit to max 3 genres to avoid overly specific queries returning 0 results
+    final limitedGenres = genres.length > 3 ? genres.sublist(0, 3) : genres;
     
+    if (limitedGenres.isEmpty) {
+      debugPrint('No genres provided');
+      return [];
+    }
+    
+    // Check cache first
+    final cacheKey = limitedGenres.join('|');
+    if (_genreCache.containsKey(cacheKey) && _genreCacheTime.containsKey(cacheKey)) {
+      final cacheAge = DateTime.now().difference(_genreCacheTime[cacheKey]!);
+      if (cacheAge < _genreCacheDuration) {
+        debugPrint('Using cached results for ${limitedGenres.join(", ")} (age: ${cacheAge.inMinutes}m)');
+        return _genreCache[cacheKey]!;
+      } else {
+        // Cache expired
+        _genreCache.remove(cacheKey);
+        _genreCacheTime.remove(cacheKey);
+      }
+    }
+    
+    final genreString = limitedGenres.map((g) => '"$g"').join(',');
+    
+    // Official AniList genres
+    final officialGenres = ['Action', 'Adventure', 'Comedy', 'Drama', 'Ecchi', 'Fantasy', 
+                            'Horror', 'Mahou Shoujo', 'Mecha', 'Music', 'Mystery', 
+                            'Psychological', 'Romance', 'Sci-Fi', 'Slice of Life', 
+                            'Sports', 'Supernatural', 'Thriller'];
+    
+    // Determine if input contains genres or tags
+    final hasGenre = limitedGenres.any((g) => officialGenres.contains(g));
+    final hasTag = limitedGenres.any((g) => !officialGenres.contains(g));
+    
+    // Build filter parameters (simplified - single query for better performance)
+    String genreTagFilter = '';
+    if (hasGenre && !hasTag) {
+      // Only genres
+      genreTagFilter = 'genre_in: [$genreString],';
+    } else if (!hasGenre && hasTag) {
+      // Only tags
+      genreTagFilter = 'tag_in: [$genreString],';
+    } else if (hasGenre && hasTag) {
+      // Mixed - separate them
+      final genreList = limitedGenres.where((g) => officialGenres.contains(g)).toList();
+      final tagList = limitedGenres.where((g) => !officialGenres.contains(g)).toList();
+      final genreStr = genreList.map((g) => '"$g"').join(',');
+      final tagStr = tagList.map((g) => '"$g"').join(',');
+      genreTagFilter = 'genre_in: [$genreStr], tag_in: [$tagStr],';
+    }
+    
+    // Simplified single query (no country filter to avoid timeout)
     final query = '''
       query {
-        Page(perPage: $_perPage) {
-          media(type: MANGA, genre_in: [$genreString], isAdult: false) {
+        Page(perPage: 40) {
+          media($genreTagFilter sort: POPULARITY_DESC, isAdult: false) {
             id
-            title {
-              romaji
-              english
-              native
-            }
+            title { romaji english native }
             description
-            coverImage {
-              large
-              medium
-            }
+            coverImage { large medium }
             bannerImage
             genres
             format
@@ -396,27 +444,24 @@ class SimpleAniListService {
             favourites
             seasonYear
             season
-            trailer {
-              id
-              site
-              thumbnail
-            }
+            countryOfOrigin
+            trailer { id site thumbnail }
           }
         }
       }
     ''';
 
-    return _executeQuery(query);
-  }
-
-  /// Get all available genres
-  Future<List<String>> getAvailableGenres() async {
     try {
-      final query = '''
-        query {
-          GenreCollection
+      // Rate limiting
+      if (_lastRequestTime != null) {
+        final timeSinceLastRequest = DateTime.now().difference(_lastRequestTime!);
+        if (timeSinceLastRequest < _minRequestInterval) {
+          final waitTime = _minRequestInterval - timeSinceLastRequest;
+          debugPrint('Rate limiting: waiting ${waitTime.inMilliseconds}ms');
+          await Future.delayed(waitTime);
         }
-      ''';
+      }
+      _lastRequestTime = DateTime.now();
 
       final response = await http.post(
         Uri.parse(_baseUrl),
@@ -425,20 +470,116 @@ class SimpleAniListService {
           'Accept': 'application/json',
         },
         body: json.encode({'query': query}),
-      );
+      ).timeout(const Duration(seconds: 15));  // Increased timeout
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
         if (jsonData['errors'] != null) {
-          throw Exception('GraphQL Error: ${jsonData['errors']}');
+          debugPrint('GraphQL Error for ${limitedGenres.join(", ")}: ${jsonData['errors']}');
+          return [];
         }
-        return List<String>.from(jsonData['data']['GenreCollection'] ?? []);
+        
+        final media = jsonData['data']?['Page']?['media'] as List<dynamic>? ?? [];
+        final comics = media.map((item) => Manga.fromJson(item)).toList();
+        
+        // Cache the results
+        _genreCache[cacheKey] = comics;
+        _genreCacheTime[cacheKey] = DateTime.now();
+        
+        final genreText = limitedGenres.join(", ");
+        if (genres.length > 3) {
+          debugPrint('Fetched ${comics.length} comics for $genreText (limited from ${genres.length} genres)');
+        } else {
+          debugPrint('Fetched ${comics.length} comics for $genreText');
+        }
+        return comics;
+      } else if (response.statusCode == 429) {
+        // Rate limited - wait and retry once
+        debugPrint('Rate limited for ${limitedGenres.join(", ")}, waiting 5s before retry...');
+        await Future.delayed(const Duration(seconds: 5));
+        _lastRequestTime = DateTime.now();
+        
+        // Retry once
+        final retryResponse = await http.post(
+          Uri.parse(_baseUrl),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: json.encode({'query': query}),
+        ).timeout(const Duration(seconds: 15));
+        
+        if (retryResponse.statusCode == 200) {
+          final jsonData = json.decode(retryResponse.body);
+          if (jsonData['errors'] == null) {
+            final media = jsonData['data']?['Page']?['media'] as List<dynamic>? ?? [];
+            final comics = media.map((item) => Manga.fromJson(item)).toList();
+            
+            // Cache the results
+            _genreCache[cacheKey] = comics;
+            _genreCacheTime[cacheKey] = DateTime.now();
+            
+            debugPrint('Retry successful: Fetched ${comics.length} comics for ${limitedGenres.join(", ")}');
+            return comics;
+          }
+        }
+        debugPrint('Retry failed for ${limitedGenres.join(", ")}');
+        return [];
       } else {
-        throw Exception('HTTP Error: ${response.statusCode}');
+        debugPrint('HTTP Error ${response.statusCode} for ${limitedGenres.join(", ")}');
+        return [];
       }
     } catch (e) {
-      throw Exception('Failed to fetch genres: $e');
+      debugPrint('Error fetching comics for ${limitedGenres.join(", ")}: $e');
+      return [];
     }
+  }
+
+  /// Get curated common genres only (simplified for better UX)
+  Future<List<String>> getAvailableGenres() async {
+    // Curated list of common and popular genres/tags
+    final commonCategories = [
+      // Official Genres (popular ones)
+      'Action',
+      'Adventure',
+      'Comedy',
+      'Drama',
+      'Ecchi',
+      'Fantasy',
+      'Horror',
+      'Mecha',
+      'Music',
+      'Mystery',
+      'Psychological',
+      'Romance',
+      'Sci-Fi',
+      'Slice of Life',
+      'Sports',
+      'Supernatural',
+      'Thriller',
+      
+      // Popular Tags (commonly used)
+      'Isekai',
+      'Reincarnation',
+      'Magic',
+      'School',
+      'Historical',
+      'Military',
+      'Martial Arts',
+      'Demons',
+      'Vampire',
+      'Zombie',
+      'Post-Apocalyptic',
+      'Time Travel',
+      'Survival',
+      'Gore',
+    ];
+    
+    // Sort alphabetically for better UX
+    commonCategories.sort((a, b) => a.compareTo(b));
+    
+    debugPrint('Loaded ${commonCategories.length} common categories');
+    return commonCategories;
   }
 
   /// Execute GraphQL query with rate limiting and retry
@@ -528,7 +669,7 @@ class SimpleAniListService {
   Future<Manga?> getMangaById(int id) async {
     final query = '''
       query {
-        Media(id: $id, type: MANGA) {
+        Media(id: $id) {
           id
           title {
             romaji
@@ -602,7 +743,7 @@ class SimpleAniListService {
     // Try basic query first
     final basicQuery = '''
       query {
-        Media(id: $id, type: MANGA) {
+        Media(id: $id) {
           id
           title {
             romaji
@@ -698,7 +839,7 @@ class SimpleAniListService {
 
     final query = '''
       query {
-        Media(id: $id, type: MANGA) {
+        Media(id: $id) {
           externalLinks {
             site
             url
@@ -807,7 +948,7 @@ class SimpleAniListService {
   Future<List<MangaCharacter>> getMangaCharacters(int id) async {
     final query = '''
       query {
-        Media(id: $id, type: MANGA) {
+        Media(id: $id) {
           characters(sort: ROLE, perPage: 10) {
             edges {
               role
@@ -864,7 +1005,7 @@ class SimpleAniListService {
   Future<List<MangaRelation>> getMangaRelations(int id) async {
     final query = '''
       query {
-        Media(id: $id, type: MANGA) {
+        Media(id: $id) {
           relations {
             edges {
               relationType
@@ -925,7 +1066,7 @@ class SimpleAniListService {
   Future<List<Manga>> getMangaRecommendations(int id) async {
     final query = '''
       query {
-        Media(id: $id, type: MANGA) {
+        Media(id: $id) {
           recommendations(sort: RATING_DESC, perPage: 10) {
             edges {
               node {
@@ -1180,9 +1321,9 @@ class SimpleAniListService {
 
     final query = '''
       query {
-        # Featured titles (predefined IDs)
-        featured: Page(perPage: 4) {
-          media(id_in: [119257, 53390, 105398, 85934], type: MANGA, isAdult: false) {
+        # Featured titles (predefined IDs - 14 high-quality manga - show ALL)
+        featured: Page(perPage: 20) {
+          media(id_in: [119257, 53390, 105398, 85934, 109957, 101517, 87216, 169355, 120980, 137714, 187944, 97216, 173062, 108428], type: MANGA, isAdult: false) {
             id
             title { romaji english native }
             description
@@ -1201,7 +1342,7 @@ class SimpleAniListService {
         }
         
         # Popular manga
-        popular: Page(perPage: 4) {
+        popular: Page(perPage: 20) {
           media(type: MANGA, sort: POPULARITY_DESC, isAdult: false) {
             id
             title { romaji english native }
@@ -1221,8 +1362,8 @@ class SimpleAniListService {
         }
         
         # New releases
-        newReleases: Page(perPage: 4) {
-          media(type: MANGA, sort: ID_DESC, isAdult: false) {
+        newReleases: Page(perPage: 20) {
+          media(type: MANGA, sort: START_DATE_DESC, isAdult: false) {
             id
             title { romaji english native }
             description
@@ -1241,7 +1382,7 @@ class SimpleAniListService {
         }
         
         # Top rated
-        topRated: Page(perPage: 4) {
+        topRated: Page(perPage: 20) {
           media(type: MANGA, sort: SCORE_DESC, isAdult: false) {
             id
             title { romaji english native }
@@ -1261,7 +1402,7 @@ class SimpleAniListService {
         }
         
         # Trending (recently popular)
-        trending: Page(perPage: 4) {
+        trending: Page(perPage: 20) {
           media(type: MANGA, sort: TRENDING_DESC, isAdult: false) {
             id
             title { romaji english native }
@@ -1280,9 +1421,9 @@ class SimpleAniListService {
           }
         }
         
-        # Seasonal (current season)
-        seasonal: Page(perPage: 4) {
-          media(type: MANGA, season: ${_getCurrentSeason(DateTime.now())}, seasonYear: ${DateTime.now().year}, isAdult: false) {
+        # Completed Manga (high-rated finished series)
+        completed: Page(perPage: 20) {
+          media(type: MANGA, status: FINISHED, sort: SCORE_DESC, averageScore_greater: 75, isAdult: false) {
             id
             title { romaji english native }
             description
@@ -1335,7 +1476,7 @@ class SimpleAniListService {
           'newReleases': _parseMangaList(data['data']['newReleases']['media']),
           'topRated': _parseMangaList(data['data']['topRated']['media']),
           'trending': _parseMangaList(data['data']['trending']['media']),
-          'seasonal': _parseMangaList(data['data']['seasonal']['media']),
+          'completed': _parseMangaList(data['data']['completed']['media']),
         };
         
         // Cache the result with timestamp
@@ -1366,7 +1507,7 @@ class SimpleAniListService {
       'newReleases': [],
       'topRated': [],
       'trending': [],
-      'seasonal': [],
+      'completed': [],
     };
   }
 
@@ -1384,6 +1525,13 @@ class SimpleAniListService {
     debugPrint('Search cache cleared');
   }
 
+  /// Clear genre cache
+  static void clearGenreCache() {
+    _genreCache.clear();
+    _genreCacheTime.clear();
+    debugPrint('Genre cache cleared');
+  }
+  
   /// Clear all caches
   static void clearAllCaches() {
     _mixedFeedCache.clear();
@@ -1391,6 +1539,8 @@ class SimpleAniListService {
     _searchCache.clear();
     _searchCacheTime.clear();
     _externalLinksCache.clear();
+    _genreCache.clear();
+    _genreCacheTime.clear();
     debugPrint('All caches cleared');
   }
 }

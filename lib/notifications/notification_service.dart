@@ -99,10 +99,10 @@ class AppNotificationService {
     await _loadMessageCache();
 
     // Get title and body from data payload (Cloud Function sends data-only)
-    final title = message.data['title'] ?? message.notification?.title ?? 'New message';
+    final title = message.data['title'] ?? message.notification?.title ?? 'New notification';
     final body = message.data['body'] ?? message.notification?.body ?? '';
     final type = message.data['type'] ?? '';
-    final chatId = message.data['chatId'] ?? 'default';
+    final chatId = message.data['chatId'] ?? message.data['forumId'] ?? 'default';
 
     // For DM notifications, use inbox style with message caching
     if (type == 'dm') {
@@ -189,8 +189,35 @@ class AppNotificationService {
         details,
         payload: jsonEncode(message.data),
       );
+    } else if (type == 'mention') {
+      // For mention notifications, use simple notification with high priority
+      const androidDetails = AndroidNotificationDetails(
+        chatChannelId,
+        chatChannelName,
+        channelDescription: chatChannelDesc,
+        importance: Importance.max,
+        priority: Priority.high,
+        enableVibration: true,
+        playSound: true,
+        icon: '@mipmap/ic_launcher',
+        autoCancel: true,
+        category: AndroidNotificationCategory.social,
+      );
+      const iOSDetails = DarwinNotificationDetails();
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iOSDetails,
+      );
+
+      await _plugin.show(
+        DateTime.now().millisecondsSinceEpoch % 100000,
+        title,
+        body,
+        details,
+        payload: jsonEncode(message.data),
+      );
     } else {
-      // For non-DM notifications (like, follow), use simple notification
+      // For other notifications (like, follow), use simple notification
       const androidDetails = AndroidNotificationDetails(
         chatChannelId,
         chatChannelName,

@@ -15,11 +15,17 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'notifications/notification_service.dart';
 import 'ui/screens/chat_screen.dart';
+import 'ui/screens/detail_screen.dart';
+import 'ui/screens/forum_chat_screen.dart';
 import 'ui/screens/main_screen.dart';
+import 'data/models/forum.dart';
+import 'data/models/nandogami_item.dart';
+import 'data/models/comic_item.dart';
 
 import 'core/constants.dart';
 import 'core/theme.dart';
 import 'data/repositories/comic_repository.dart';
+import 'data/services/xp_service.dart';
 import 'firebase_options.dart';
 import 'state/item_provider.dart';
 import 'state/theme_provider.dart';
@@ -34,9 +40,17 @@ const MethodChannel _notificationChannel = MethodChannel('com.example.nandogami/
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // System will show notification automatically from notification payload
-  // This handler is just to keep FCM working properly
-  // Navigation is handled by native MainActivity when notification is tapped
+  // Initialize Firebase if needed
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  
+  // Show local notification for better control over tap handling
+  // This ensures notification tap can navigate properly even when app is terminated
+  try {
+    await AppNotificationService.instance.initialize();
+    await AppNotificationService.instance.showForegroundRemote(message);
+  } catch (e) {
+    debugPrint('Error showing background notification: $e');
+  }
 }
 
 Future<void> _configureMessaging() async {
@@ -60,6 +74,16 @@ Future<void> _configureMessaging() async {
         await FirebaseFirestore.instance.collection('users').doc(u.uid).set({
           'lastSeen': DateTime.now().millisecondsSinceEpoch,
         }, SetOptions(merge: true));
+      } catch (e) {
+        // Silently fail
+      }
+      // Award daily login bonus XP
+      try {
+        final xpService = XPService();
+        await xpService.awardDailyLogin(u.uid);
+        
+        // Award MAX XP to developer accounts (SSS Class) 👑
+        await xpService.awardDeveloperMaxXP(u.uid);
       } catch (e) {
         // Silently fail
       }
@@ -123,7 +147,10 @@ void _showInAppNotification(RemoteMessage message) {
       final type = message.data['type'];
 
       // Choose emoji based on notification type
-      final emoji = type == 'dm' ? '💬' : (type == 'like' ? '❤️' : (type == 'follow' ? '👤' : '🔔'));
+      final emoji = type == 'dm' ? '💬' : 
+                    (type == 'like' ? '❤️' : 
+                    (type == 'follow' ? '👤' : 
+                    (type == 'mention' ? '📣' : '🔔')));
 
       scaffoldMessenger.showSnackBar(
         SnackBar(
@@ -175,7 +202,20 @@ Future<void> _handleMessageNavigation(RemoteMessage message, {required bool init
     return;
   }
 
-  // Handle different notification types
+  // When app is launched from notification (closed state), just go to Home
+  // Same behavior as clicking app icon - simple and has proper back stack
+  if (initial) {
+    debugPrint('📱 App launched from notification ($type), navigating to Home');
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => const MainScreen(initialIndex: 0), // Home tab
+      ),
+      (route) => false, // Clear all routes including SplashScreen
+    );
+    return;
+  }
+
+  // When app is already running (foreground), navigate to specific page
   switch (type) {
     case 'dm':
       final senderId = message.data['senderId'];
@@ -195,14 +235,103 @@ Future<void> _handleMessageNavigation(RemoteMessage message, {required bool init
       );
       break;
 
+    case 'mention':
+      final forumId = message.data['forumId'];
+      if (forumId == null || forumId.toString().isEmpty) {
+        debugPrint('⚠️ Mention notification missing forumId');
+        return;
+      }
+      
+      try {
+        final forumDoc = await FirebaseFirestore.instance
+            .collection('forums')
+            .doc(forumId)
+            .get();
+        
+        if (!forumDoc.exists) {
+          debugPrint('⚠️ Forum not found: $forumId');
+          if (navigator.mounted) {
+            ScaffoldMessenger.of(navigator.context).showSnackBar(
+              const SnackBar(content: Text('Forum not found or deleted')),
+            );
+          }
+          return;
+        }
+        
+        final forum = Forum.fromMap(forumDoc.id, forumDoc.data()!);
+        
+        navigator.push(
+          MaterialPageRoute(
+            builder: (_) => ForumChatScreen(forum: forum),
+          ),
+        );
+      } catch (e) {
+        debugPrint('⚠️ Error navigating to forum: $e');
+        if (navigator.mounted) {
+          ScaffoldMessenger.of(navigator.context).showSnackBar(
+            SnackBar(content: Text('Error opening forum: $e')),
+          );
+        }
+      }
+      break;
+
     case 'like':
+      final itemId = message.data['itemId'];
+      if (itemId == null || itemId.toString().isEmpty) {
+        debugPrint('⚠️ Like notification missing itemId');
+        return;
+      }
+      
+      try {
+        final itemProvider = Provider.of<ItemProvider>(
+          navigator.context,
+          listen: false,
+        );
+        
+        var item = itemProvider.items.cast<NandogamiItem?>().firstWhere(
+          (i) => i?.id == itemId,
+          orElse: () => null,
+        );
+        
+        if (item == null) {
+          final anilistId = int.tryParse(itemId);
+          if (anilistId != null) {
+            final repo = ComicRepository();
+            final comicItem = await repo.getDetail(anilistId);
+            item = NandogamiItem(
+              id: comicItem.id,
+              title: comicItem.title,
+              imageUrl: comicItem.imageUrl,
+              description: comicItem.description,
+              popularity: comicItem.popularity ?? 0,
+              rating: comicItem.rating,
+              genres: comicItem.categories,
+              status: comicItem.status,
+              type: comicItem.format,
+            );
+          }
+        }
+        
+        if (item == null) {
+          debugPrint('⚠️ Item not found: $itemId');
+          return;
+        }
+        
+        navigator.push(
+          MaterialPageRoute(
+            builder: (_) => DetailScreen(item: item!),
+          ),
+        );
+      } catch (e) {
+        debugPrint('⚠️ Error navigating to detail: $e');
+      }
+      break;
+
     case 'follow':
-      // Navigate to MainScreen Profile tab
-      navigator.pushAndRemoveUntil(
+      navigator.push(
         MaterialPageRoute(
-          builder: (_) => const MainScreen(initialIndex: 3),
+          builder: (_) => const MainScreen(initialIndex: 3), // Profile tab
         ),
-        (route) => false,
       );
       break;
   }

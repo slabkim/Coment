@@ -97,6 +97,13 @@ class ItemProvider extends ChangeNotifier {
     try {
       final searchResults = await repo.search(query);
       _filtered = ComicAdapter.toNandogamiItems(searchResults);
+      
+      // If API returns no results and query is long enough for typos,
+      // try local fuzzy search as fallback
+      if (_filtered.isEmpty && query.length > 3) {
+        debugPrint('API returned no results for "$query", trying local fuzzy search...');
+        _applyFilter(); // This includes fuzzy matching
+      }
     } catch (e, stackTrace) {
       ApiErrorHandler.logError(e, stackTrace);
       // Fallback to local search if API fails
@@ -161,9 +168,9 @@ class ItemProvider extends ChangeNotifier {
           }
         }
         
-        // Add popularity bonus (normalize popularity to 0-10 range)
+        // Add popularity bonus (normalize popularity to 0-20 range for more weight)
         final popularity = e.popularity ?? 0;
-        final popularityBonus = (popularity / 10000).clamp(0, 10);
+        final popularityBonus = (popularity / 5000).clamp(0, 20);
         score += popularityBonus;
         
         if (score > 0) {
@@ -171,8 +178,17 @@ class ItemProvider extends ChangeNotifier {
         }
       }
       
-      // Sort by score (descending) and take results
-      scoredItems.sort((a, b) => b.value.compareTo(a.value));
+      // Sort by score (descending), then by popularity if scores are close
+      scoredItems.sort((a, b) {
+        final scoreDiff = b.value.compareTo(a.value);
+        // If scores are very close (within 5 points), sort by popularity
+        if ((b.value - a.value).abs() < 5) {
+          final popA = a.key.popularity ?? 0;
+          final popB = b.key.popularity ?? 0;
+          return popB.compareTo(popA);
+        }
+        return scoreDiff;
+      });
       _filtered = scoredItems.map((e) => e.key).toList();
     }
   }

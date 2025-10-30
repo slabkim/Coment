@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'home_screen_new.dart';
-import 'search_screen.dart';
+import 'forums_list_screen.dart';
 import 'news_screen.dart';
 import 'profile_screen.dart';
 
@@ -18,7 +18,7 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _screens = [
     const HomeScreenNew(),
-    const SearchScreen(),
+    const ForumsListScreen(),
     const NewsScreen(),
     const ProfileScreen(),
   ];
@@ -39,7 +39,7 @@ class _MainScreenState extends State<MainScreen> {
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
+          BottomNavigationBarItem(icon: Icon(Icons.forum), label: 'Forums'),
           BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: 'News'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],

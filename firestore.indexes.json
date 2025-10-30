@@ -25,6 +25,23 @@
       ]
     },
     {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "titleId", "order": "ASCENDING"},
+        {"fieldPath": "parentId", "order": "ASCENDING"},
+        {"fieldPath": "timestamp", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "parentId", "order": "ASCENDING"},
+        {"fieldPath": "timestamp", "order": "ASCENDING"}
+      ]
+    },
+    {
       "collectionGroup": "favorites",
       "queryScope": "COLLECTION",
       "fields": [
@@ -41,17 +58,60 @@
       ]
     },
     {
-      "collectionGroup": "users",
+      "collectionGroup": "forums",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "handleLower", "order": "ASCENDING"}
+        {"fieldPath": "memberCount", "order": "DESCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
       ]
     },
     {
-      "collectionGroup": "users",
+      "collectionGroup": "forum_messages",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "usernameLower", "order": "ASCENDING"}
+        {"fieldPath": "forumId", "order": "ASCENDING"},
+        {"fieldPath": "timestamp", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "forum_messages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "forumId", "order": "ASCENDING"},
+        {"fieldPath": "isPinned", "order": "ASCENDING"},
+        {"fieldPath": "timestamp", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "forum_members",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "forumId", "order": "ASCENDING"},
+        {"fieldPath": "joinedAt", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "forum_members",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "userId", "order": "ASCENDING"},
+        {"fieldPath": "joinedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "user_forums",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "userId", "order": "ASCENDING"},
+        {"fieldPath": "forumId", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "user_forums",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "forumId", "order": "ASCENDING"},
+        {"fieldPath": "userId", "order": "ASCENDING"}
       ]
     }
   ],

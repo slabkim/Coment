@@ -31,6 +31,7 @@ dependencies:
   flutter_dotenv: ^5.1.0
   google_sign_in: ^6.2.1
   youtube_player_flutter: ^9.0.3
+  giphy_get: ^3.6.0
 
 dev_dependencies:
   flutter_test:

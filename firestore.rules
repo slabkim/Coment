@@ -19,7 +19,10 @@ service cloud.firestore {
     }
 
     match /favorites/{favoriteId} {
-      allow read, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      // Allow read for all authenticated users (for public profile showcase)
+      allow read: if request.auth != null;
+      // Only allow delete by owner
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
 
@@ -29,7 +32,7 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
       allow update: if request.auth != null && (
         request.auth.uid == resource.data.userId ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replyCount', 'likeCount'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replyCount', 'likeCount', 'replies'])
       );
     }
 
@@ -38,6 +41,27 @@ service cloud.firestore {
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
       allow update: if false;
+    }
+    
+    match /notifications/{notificationId} {
+      // Allow read if user is the recipient or sender
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.recipientUid ||
+        request.auth.uid == resource.data.userId
+      );
+      // Anyone can create notifications (for mentions, etc.)
+      allow create: if request.auth != null;
+      // Allow update if user is the recipient (to mark as read) or Cloud Function (to mark as sent)
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.recipientUid ||
+        request.auth.uid == resource.data.userId ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sent', 'sentAt', 'read', 'readAt'])
+      );
+      // Allow delete if user is the recipient
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.recipientUid ||
+        request.auth.uid == resource.data.userId
+      );
     }
 
     match /reading_status/{statusId} {
@@ -77,8 +101,8 @@ service cloud.firestore {
       // Allow read if user is a participant in the chat (for read receipts)
       allow read: if request.auth != null && (
         historyId.matches('.*_' + request.auth.uid + '$') ||
-        request.auth.uid == resource.data.userId ||
-        request.auth.uid in get(/databases/$(database)/documents/chats/$(resource.data.chatId)).data.participants
+        (resource != null && request.auth.uid == resource.data.userId) ||
+        (resource != null && request.auth.uid in get(/databases/$(database)/documents/chats/$(resource.data.chatId)).data.participants)
       );
       // Allow create/update only for own history
       allow create: if request.auth != null && (
@@ -88,7 +112,7 @@ service cloud.firestore {
       );
       allow update: if request.auth != null && (
         historyId.matches('.*_' + request.auth.uid + '$') ||
-        request.auth.uid == resource.data.userId
+        (resource != null && request.auth.uid == resource.data.userId)
       );
       allow delete: if false;
     }
@@ -103,27 +127,63 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == resource.data.fromUserId;
     }
 
+
+    // FORUMS (User-Created Forums - Free Topic)
     match /forums/{forumId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
+      allow read: if true; // Anyone can read forum info
+      allow create: if request.auth != null; // Any logged-in user can create
       allow update: if request.auth != null && (
-        request.auth.uid == resource.data.creatorId ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberCount', 'lastMessage', 'lastMessageTime', 'lastMessageSenderId', 'lastMessageSenderName'])
+        request.auth.uid in resource.data.moderatorIds ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'messageCount', 'lastMessageAt', 'lastMessageText', 'lastMessageUser', 'moderatorIds', 'pinnedMessageIds'])
       );
-      allow delete: if request.auth != null && request.auth.uid == resource.data.creatorId;
+      // Delete: creator or anyone in moderatorIds can delete (developer auto-added as moderator)
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.createdBy ||
+        request.auth.uid in resource.data.moderatorIds
+      );
     }
 
+    // FORUM MESSAGES
     match /forum_messages/{messageId} {
-      allow read: if request.auth != null && 
-        request.auth.uid in get(/databases/$(database)/documents/forums/$(resource.data.forumId)).data.members;
-      allow create: if request.auth != null && 
-        request.resource.data.senderId == request.auth.uid &&
-        request.auth.uid in get(/databases/$(database)/documents/forums/$(request.resource.data.forumId)).data.members;
+      allow read: if true; // Anyone can read messages
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      // Allow update: message owner, moderators (for pinning), or forum creator
       allow update: if request.auth != null && (
-        request.auth.uid == resource.data.senderId ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'readBy'])
+        request.auth.uid == resource.data.userId ||
+        request.auth.uid in get(/databases/$(database)/documents/forums/$(resource.data.forumId)).data.moderatorIds ||
+        request.auth.uid == get(/databases/$(database)/documents/forums/$(resource.data.forumId)).data.createdBy ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
       );
-      allow delete: if false;
+      // Allow delete: message owner, forum moderators, OR forum creator
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.userId ||
+        request.auth.uid in get(/databases/$(database)/documents/forums/$(resource.data.forumId)).data.moderatorIds ||
+        request.auth.uid == get(/databases/$(database)/documents/forums/$(resource.data.forumId)).data.createdBy
+      );
+    }
+
+    // FORUM MEMBERS
+    match /forum_members/{memberId} {
+      // memberId format: "{forumId}_{userId}"
+      allow read: if true;
+      allow create: if request.auth != null && memberId.matches('.*_' + request.auth.uid + '$');
+      allow update: if request.auth != null && (
+        memberId.matches('.*_' + request.auth.uid + '$') ||
+        request.auth.uid in get(/databases/$(database)/documents/forums/$(request.resource.data.forumId)).data.moderatorIds
+      );
+      // Allow delete by user themselves OR forum moderators (for cascade delete)
+      allow delete: if request.auth != null;
+    }
+
+    // USER FORUM SUBSCRIPTIONS
+    match /user_forums/{subscriptionId} {
+      // subscriptionId format: "{userId}_{forumId}"
+      // Allow read for own subscriptions OR when listing for forum deletion (moderator)
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && subscriptionId.matches('^' + request.auth.uid + '_.*');
+      allow update: if request.auth != null && subscriptionId.matches('^' + request.auth.uid + '_.*');
+      // Allow delete by user themselves OR forum moderators (for cascade delete)
+      allow delete: if request.auth != null;
     }
   }
 }

@@ -1,9 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppConst {
   static const appName = 'Coment';
   static const baseUrl = 'https://example.com/api';
-  static const giphyApiKey = 'p6voZ9nHm0dUKU1umv6F9TlC263MDUQy';
+  
+  // 🔐 SECURE: API keys loaded from .env file (not committed to git)
+  // Create a .env file in project root with: GIPHY_API_KEY=your_key_here
+  static String get giphyApiKey {
+    final key = dotenv.env['GIPHY_API_KEY'];
+    if (key == null || key.isEmpty) {
+      throw Exception(
+        '❌ GIPHY_API_KEY not found!\n'
+        '📝 Create a .env file in project root with:\n'
+        'GIPHY_API_KEY=your_giphy_api_key_here\n'
+        '🔑 Get free API key from: https://developers.giphy.com/'
+      );
+    }
+    return key;
+  }
+  
+  // Developer account UID (absolute admin - auto-moderator in all forums)
+  static const developerUid = 'YBOVlOR7MIQAbp4e3sRb9GJ24Kg1'; // anandasubing190305@gmail.com
 }
 
 class AppColors {

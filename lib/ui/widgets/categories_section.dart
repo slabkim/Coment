@@ -29,6 +29,8 @@ class _CategoriesSectionState extends State<CategoriesSection> {
   }
 
   Future<void> _loadGenres() async {
+    if (!mounted) return;
+    
     setState(() {
       _loading = true;
       _error = null;
@@ -36,11 +38,15 @@ class _CategoriesSectionState extends State<CategoriesSection> {
 
     try {
       final genres = await _mangaService.getAvailableGenres();
+      if (!mounted) return;
+      
       setState(() {
         _genres = genres;
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
+      
       setState(() {
         _error = e.toString();
         _loading = false;
@@ -64,9 +70,7 @@ class _CategoriesSectionState extends State<CategoriesSection> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Center(
-        child: CircularProgressIndicator(
-          color: AppColors.purpleAccent,
-        ),
+        child: CircularProgressIndicator(),
       );
     }
 

@@ -15,6 +15,7 @@ import '../widgets/manga_section.dart';
 import 'detail_screen.dart';
 import 'profile_screen.dart';
 import 'chat_list_screen.dart';
+import 'search_screen.dart';
 
 class HomeScreenNew extends StatefulWidget {
   const HomeScreenNew({super.key});
@@ -50,7 +51,7 @@ class _HomeScreenNewState extends State<HomeScreenNew> {
         _sectionData['newReleases'] = mixedFeed['newReleases'] ?? [];
         _sectionData['topRated'] = mixedFeed['topRated'] ?? [];
         _sectionData['trending'] = mixedFeed['trending'] ?? [];
-        _sectionData['seasonal'] = mixedFeed['seasonal'] ?? [];
+        _sectionData['completed'] = mixedFeed['completed'] ?? [];
         
         // Mark all sections as loaded
         _sectionLoading['featured'] = false;
@@ -58,15 +59,12 @@ class _HomeScreenNewState extends State<HomeScreenNew> {
         _sectionLoading['newReleases'] = false;
         _sectionLoading['topRated'] = false;
         _sectionLoading['trending'] = false;
-        _sectionLoading['seasonal'] = false;
+        _sectionLoading['completed'] = false;
       });
       
       // Load additional sections separately if needed (with delay)
       await Future.delayed(Duration(seconds: 3));
       await _loadHiddenGems();
-      
-      await Future.delayed(Duration(seconds: 3));
-      await _loadRecentlyAdded();
     } catch (e) {
       debugPrint('Error loading mixed feed: $e');
       // Fallback to individual loads with longer delays
@@ -198,25 +196,6 @@ class _HomeScreenNewState extends State<HomeScreenNew> {
     }
   }
 
-  Future<void> _loadRecentlyAdded() async {
-    setState(() {
-      _sectionLoading['recent'] = true;
-      _sectionErrors['recent'] = null;
-    });
-
-    try {
-      final manga = await _mangaService.getRecentlyAdded();
-      setState(() {
-        _sectionData['recent'] = manga;
-        _sectionLoading['recent'] = false;
-      });
-    } catch (e) {
-      setState(() {
-        _sectionErrors['recent'] = e.toString();
-        _sectionLoading['recent'] = false;
-      });
-    }
-  }
 
   Future<void> _loadMangaByGenres(List<String> genres) async {
     if (genres.isEmpty) return;
@@ -321,6 +300,15 @@ class _HomeScreenNewState extends State<HomeScreenNew> {
         centerTitle: false,
         actions: [
           IconButton(
+            tooltip: 'Search',
+            icon: Icon(Icons.search, color: Theme.of(context).iconTheme.color, size: 22),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SearchScreen())
+              );
+            },
+          ),
+          IconButton(
             tooltip: 'DM',
             icon: Icon(Icons.send, color: Theme.of(context).iconTheme.color, size: 22),
             onPressed: () async {
@@ -340,10 +328,12 @@ class _HomeScreenNewState extends State<HomeScreenNew> {
       ),
       body: RefreshIndicator(
         onRefresh: _loadAllSections,
-        color: AppColors.purpleAccent,
+        color: Theme.of(context).brightness == Brightness.light
+            ? const Color(0xFF3B82F6) // Blue for light mode
+            : AppColors.purpleAccent, // Purple for dark mode
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 100),
+          padding: const EdgeInsets.only(bottom: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -428,6 +418,17 @@ class _HomeScreenNewState extends State<HomeScreenNew> {
                 onMangaTap: _onMangaTap,
               ),
 
+            // Completed Manga
+            if (_sectionData['completed']?.isNotEmpty == true)
+              MangaSection(
+                title: 'Completed Manga',
+                manga: _sectionData['completed']!,
+                isLoading: _sectionLoading['completed'] ?? false,
+                error: _sectionErrors['completed'],
+                onRetry: _loadAllSections,
+                onMangaTap: _onMangaTap,
+              ),
+
             // Hidden Gems
             if (_sectionData['hiddenGems']?.isNotEmpty == true)
               MangaSection(
@@ -439,18 +440,7 @@ class _HomeScreenNewState extends State<HomeScreenNew> {
                 onMangaTap: _onMangaTap,
               ),
 
-            // Recently Added
-            if (_sectionData['recent']?.isNotEmpty == true)
-              MangaSection(
-                title: 'Recently Added',
-                manga: _sectionData['recent']!,
-                isLoading: _sectionLoading['recent'] ?? false,
-                error: _sectionErrors['recent'],
-                onRetry: _loadRecentlyAdded,
-                onMangaTap: _onMangaTap,
-              ),
-
-            const SizedBox(height: 32),
+            const SizedBox(height: 16),
           ],
         ),
         ),
@@ -519,6 +509,12 @@ class _ProfileBadgeState extends State<_ProfileBadge> {
         backgroundColor: AppColors.purpleAccent.withValues(alpha: 0.2),
         backgroundImage: (photo.isNotEmpty)
             ? NetworkImage(photo)
+            : null,
+        onBackgroundImageError: (photo.isNotEmpty) 
+            ? (exception, stackTrace) {
+                // Silently handle image load errors
+                debugPrint('Profile image load error: $exception');
+              }
             : null,
         child: (photo.isEmpty)
             ? (_loading 

@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import '../../core/constants.dart';
 import '../../core/auth_helper.dart';
@@ -9,6 +12,7 @@ import '../../data/services/chat_history_service.dart';
 import '../../data/services/chat_service.dart';
 import '../../data/services/giphy_service.dart';
 import '../../data/services/user_service.dart';
+import '../widgets/class_badge.dart';
 import 'chat_list_screen.dart';
 import 'user_public_profile_screen.dart';
 
@@ -35,8 +39,12 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _chatId;
   final _history = ChatHistoryService();
   final _userService = UserService();
+  final _imagePicker = ImagePicker();
   String? _selfName;
   int _lastPeerMsgMs = 0;
+  File? _selectedImage;
+  String? _selectedGifUrl;
+  bool _isSending = false;
 
   @override
   void dispose() {
@@ -103,14 +111,27 @@ class _ChatScreenState extends State<ChatScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            if (profile?.userClass != null) ...[
+                              const SizedBox(width: 6),
+                              CompactClassBadge(
+                                userClass: profile!.userClass,
+                                size: 18,
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -220,9 +241,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                                     horizontal: 12,
                                                   ),
                                                   decoration: BoxDecoration(
-                                                    color: isMe
-                                                        ? const Color(0xFF3B2A58)
-                                                        : const Color(0xFF1E232B),
+                                                    color: Theme.of(context).brightness == Brightness.light
+                                                        ? Colors.black87 // Black for both in light mode
+                                                        : Colors.grey[800], // Grey for both in dark mode
                                                     borderRadius: BorderRadius.circular(
                                                       12,
                                                     ),
@@ -275,68 +296,64 @@ class _ChatScreenState extends State<ChatScreen> {
                     },
                   ),
           ),
-          Divider(height: 1, color: Theme.of(context).dividerTheme.color),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: _pickGif,
-                    icon: Icon(
-                      Icons.gif_box_outlined,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _messageC,
-                      minLines: 1,
-                      maxLines: 4,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Type a message',
-                        hintStyle: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        filled: true,
-                        fillColor: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      onSubmitted: (_) => _send(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: _send,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                    ),
-                    child: const Icon(Icons.send),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          
+          // Message input (same design as forum chat)
+          _buildMessageInput(),
         ],
       ),
     );
   }
 
-  void _send() async {
-    if (_messageC.text.trim().isEmpty) return;
+  Future<void> _pickImage() async {
+    try {
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
+      
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+          _selectedGifUrl = null; // Clear GIF if image is selected
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: $e')),
+        );
+      }
+    }
+  }
+
+  Future<String?> _uploadMessageImage(String messageId) async {
+    if (_selectedImage == null) return null;
+    
+    try {
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('chat_images')
+          .child(_chatId!)
+          .child('$messageId.jpg');
+      
+      await storageRef.putFile(_selectedImage!);
+      final downloadUrl = await storageRef.getDownloadURL();
+      
+      return downloadUrl;
+    } catch (e) {
+      debugPrint('Error uploading chat image: $e');
+      return null;
+    }
+  }
+
+  Future<void> _send() async {
+    final text = _messageC.text.trim();
+    if (text.isEmpty && _selectedImage == null && _selectedGifUrl == null) return;
+
+    // Prevent spam clicking
+    if (_isSending) return;
 
     // Cek autentikasi dulu
     final success = await AuthHelper.requireAuthWithDialog(
@@ -347,22 +364,68 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null || _chatId == null) return;
-    final senderName =
-        _selfName ??
-        FirebaseAuth.instance.currentUser?.displayName ??
-        FirebaseAuth.instance.currentUser?.email?.split('@').first;
-    _chat.sendText(
-      chatId: _chatId!,
-      senderId: uid,
-      text: _messageC.text.trim(),
-      senderName: senderName,
-    );
-    _messageC.clear();
-    _scrollC.animateTo(
-      0,
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
-    );
+    
+    setState(() => _isSending = true);
+    
+    try {
+      final senderName =
+          _selfName ??
+          FirebaseAuth.instance.currentUser?.displayName ??
+          FirebaseAuth.instance.currentUser?.email?.split('@').first;
+      
+      // Handle image upload
+      if (_selectedImage != null) {
+        final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+        final imageUrl = await _uploadMessageImage(tempId);
+        
+        if (imageUrl != null) {
+          await _chat.sendImage(
+            chatId: _chatId!,
+            senderId: uid,
+            imageUrl: imageUrl,
+            senderName: senderName,
+          );
+        }
+      } else if (_selectedGifUrl != null) {
+        // Send GIF
+        await _chat.sendImage(
+          chatId: _chatId!,
+          senderId: uid,
+          imageUrl: _selectedGifUrl!,
+          senderName: senderName,
+        );
+      } else if (text.isNotEmpty) {
+        // Send text
+        await _chat.sendText(
+          chatId: _chatId!,
+          senderId: uid,
+          text: text,
+          senderName: senderName,
+        );
+      }
+      
+      _messageC.clear();
+      if (mounted) {
+        setState(() {
+          _selectedImage = null;
+          _selectedGifUrl = null;
+          _isSending = false;
+        });
+      }
+      
+      _scrollC.animateTo(
+        0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSending = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sending message: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _pickGif() async {
@@ -381,20 +444,12 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       builder: (_) => _GifPicker(giphy: _giphy),
     );
+    
     if (url != null && url.isNotEmpty) {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid != null && _chatId != null) {
-        final senderName =
-            _selfName ??
-            FirebaseAuth.instance.currentUser?.displayName ??
-            FirebaseAuth.instance.currentUser?.email?.split('@').first;
-        await _chat.sendImage(
-          chatId: _chatId!,
-          senderId: uid,
-          imageUrl: url,
-          senderName: senderName,
-        );
-      }
+      setState(() {
+        _selectedGifUrl = url;
+        _selectedImage = null; // Clear image if GIF is selected
+      });
     }
   }
 
@@ -421,6 +476,162 @@ class _ChatScreenState extends State<ChatScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => UserPublicProfileScreen(userId: userId),
+      ),
+    );
+  }
+
+  Widget _buildMessageInput() {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Image preview
+          if (_selectedImage != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              height: 120,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.purpleAccent),
+              ),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      _selectedImage!,
+                      width: double.infinity,
+                      height: 120,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: IconButton(
+                      icon: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(Icons.close, size: 16, color: Colors.white),
+                      ),
+                      onPressed: () => setState(() => _selectedImage = null),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
+          // GIF preview
+          if (_selectedGifUrl != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              height: 120,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.purpleAccent),
+              ),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      _selectedGifUrl!,
+                      width: double.infinity,
+                      height: 120,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: double.infinity,
+                        height: 120,
+                        color: Theme.of(context).colorScheme.surfaceVariant,
+                        child: const Icon(Icons.error, size: 32),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: IconButton(
+                      icon: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Icon(Icons.close, size: 16, color: Colors.white),
+                      ),
+                      onPressed: () => setState(() => _selectedGifUrl = null),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
+          // Input row
+          Row(
+            children: [
+              IconButton(
+                onPressed: _pickImage,
+                icon: Icon(
+                  Icons.image,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+                tooltip: 'Add Image',
+              ),
+              IconButton(
+                onPressed: _pickGif,
+                icon: Icon(
+                  Icons.gif_box,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+                tooltip: 'Add GIF',
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _messageC,
+                  decoration: InputDecoration(
+                    hintText: 'Type a message...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                  maxLines: null,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _send(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _isSending ? null : _send,
+                icon: _isSending
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        Icons.send,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

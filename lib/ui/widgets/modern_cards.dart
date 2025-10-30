@@ -74,7 +74,6 @@ class ModernMangaCard extends StatelessWidget {
                             color: AppColors.grayDark,
                             child: const Center(
                               child: CircularProgressIndicator(
-                                color: AppColors.purpleAccent,
                                 strokeWidth: 2,
                               ),
                             ),

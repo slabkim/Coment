@@ -208,7 +208,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
     final width = MediaQuery.sizeOf(context).width;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: AbsorbPointer(
         absorbing: _busy,
         child: Stack(
@@ -225,7 +225,9 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF3B2A58),
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? const Color(0xFF3B82F6).withOpacity(0.1) // Light blue for light mode
+                          : const Color(0xFF3B2A58), // Purple for dark mode
                       shape: BoxShape.circle,
                     ),
                     clipBehavior: Clip.antiAlias,
@@ -242,19 +244,21 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                   // App name
                   Text(
                     AppConst.appName,
-                    style: const TextStyle(
-                      color: AppColors.purpleAccent,
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? const Color(0xFF3B82F6) // Blue for light mode
+                          : AppColors.purpleAccent, // Purple for dark mode
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 2),
                   // Subtitle
-                  const Text(
+                  Text(
                     'Your personal manga, manhwa, and manhua recommendation app',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: AppColors.whiteSecondary,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 14,
                     ),
                   ),
@@ -266,7 +270,9 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF121316), // black_light feel
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? Colors.grey[200] // Light grey for light mode
+                          : const Color(0xFF121316), // Dark for dark mode
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -293,8 +299,8 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                   // Welcome / Create account title
                   Text(
                     _isLogin ? 'Welcome back' : 'Create an account',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
@@ -344,15 +350,25 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                   // Divider
                   Row(
                     children: [
-                      const Expanded(child: Divider(color: Color(0xFF2A2E35))),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'atau',
-                          style: TextStyle(color: AppColors.whiteSecondary),
+                      Expanded(
+                        child: Divider(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.2),
                         ),
                       ),
-                      const Expanded(child: Divider(color: Color(0xFF2A2E35))),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'atau',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Divider(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.2),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -368,11 +384,11 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
 
                   // Footer
                   SizedBox(height: width > 400 ? 50 : 30),
-                  const Text(
+                  Text(
                     '© 2025 Nandogami. All rights reserved.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Color(0xFF7E7E7E), // white_disabled feel
+                      color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
                       fontSize: 12,
                     ),
                   ),
@@ -410,19 +426,24 @@ class _TabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       borderRadius: BorderRadius.circular(10),
       onTap: onTap,
       child: Ink(
         decoration: BoxDecoration(
-          color: active ? AppColors.purpleAccent : const Color(0xFF121316),
+          color: active
+              ? (isDark ? AppColors.purpleAccent : const Color(0xFF3B82F6)) // Purple for dark, blue for light
+              : (isDark ? const Color(0xFF121316) : Colors.grey[200]), // Dark grey for dark, light grey for light
           borderRadius: BorderRadius.circular(10),
         ),
         child: Center(
           child: Text(
             text,
             style: TextStyle(
-              color: active ? Colors.white : const Color(0xFF8E8E8E),
+              color: active
+                  ? (isDark ? Colors.white : Colors.black87) // White for dark, black for light when active
+                  : (isDark ? const Color(0xFF8E8E8E) : Colors.grey[600]), // Grey for inactive
               fontWeight: active ? FontWeight.bold : FontWeight.w500,
             ),
           ),
@@ -480,7 +501,7 @@ class _LoginFormState extends State<_LoginForm> {
             suffixIcon: IconButton(
               icon: Icon(
                 _obscure ? Icons.visibility_off : Icons.visibility,
-                color: Colors.white70,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               onPressed: () => setState(() => _obscure = !_obscure),
             ),
@@ -494,24 +515,37 @@ class _LoginFormState extends State<_LoginForm> {
             children: [
               ValueListenableBuilder<bool>(
                 valueListenable: widget.rememberMe,
-                builder: (_, val, __) => Checkbox(
-                  value: val,
-                  onChanged: (x) => widget.rememberMe.value = x ?? false,
-                  side: const BorderSide(color: Colors.white54),
-                  checkColor: Colors.white,
-                  activeColor: AppColors.purpleAccent,
-                ),
+                builder: (_, val, __) {
+                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  return Checkbox(
+                    value: val,
+                    onChanged: (x) => widget.rememberMe.value = x ?? false,
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    checkColor: Colors.white,
+                    activeColor: isDark
+                        ? AppColors.purpleAccent
+                        : const Color(0xFF3B82F6),
+                  );
+                },
               ),
-              const Text(
+              Text(
                 'Remember me',
-                style: TextStyle(color: AppColors.whiteSecondary),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const Spacer(),
               TextButton(
                 onPressed: widget.onForgot,
-                child: const Text(
+                child: Text(
                   'Forgot password?',
-                  style: TextStyle(color: AppColors.purpleAccent),
+                  style: TextStyle(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.purpleAccent
+                        : const Color(0xFF3B82F6),
+                  ),
                 ),
               ),
             ],
@@ -581,7 +615,7 @@ class _SignupFormState extends State<_SignupForm> {
             suffixIcon: IconButton(
               icon: Icon(
                 _obscure ? Icons.visibility_off : Icons.visibility,
-                color: Colors.white70,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               onPressed: () => setState(() => _obscure = !_obscure),
             ),
@@ -592,11 +626,14 @@ class _SignupFormState extends State<_SignupForm> {
             },
           ),
           const SizedBox(height: 6),
-          const Align(
+          Align(
             alignment: Alignment.centerLeft,
             child: Text(
               'Password must be at least 8 characters long',
-              style: TextStyle(color: Color(0xFF7E7E7E), fontSize: 13),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                fontSize: 13,
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -604,18 +641,27 @@ class _SignupFormState extends State<_SignupForm> {
             children: [
               ValueListenableBuilder<bool>(
                 valueListenable: widget.agreeTerms,
-                builder: (_, val, __) => Checkbox(
-                  value: val,
-                  onChanged: (x) => widget.agreeTerms.value = x ?? false,
-                  side: const BorderSide(color: Colors.white54),
-                  checkColor: Colors.white,
-                  activeColor: AppColors.purpleAccent,
-                ),
+                builder: (_, val, __) {
+                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  return Checkbox(
+                    value: val,
+                    onChanged: (x) => widget.agreeTerms.value = x ?? false,
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    checkColor: Colors.white,
+                    activeColor: isDark
+                        ? AppColors.purpleAccent
+                        : const Color(0xFF3B82F6),
+                  );
+                },
               ),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'I agree to the Terms of Service and Privacy Policy',
-                  style: TextStyle(color: AppColors.whiteSecondary),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
@@ -647,24 +693,35 @@ class _OutlinedField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return TextFormField(
       controller: controller,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(
+        color: isDark ? Colors.white : Colors.black87,
+      ),
       keyboardType: keyboardType,
       obscureText: obscureText,
       validator: validator,
       textInputAction: textInputAction,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white54),
+        hintStyle: TextStyle(
+          color: isDark ? Colors.white54 : Colors.black45,
+        ),
         filled: true,
-        fillColor: const Color(0xFF121316), // black_light
+        fillColor: isDark
+            ? const Color(0xFF121316) // Dark for dark mode
+            : Colors.grey[100], // Light grey for light mode
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
           vertical: 14,
         ),
-        enabledBorder: _border(const Color(0xFF2A2E35)),
-        focusedBorder: _border(AppColors.purpleAccent),
+        enabledBorder: _border(
+          isDark ? const Color(0xFF2A2E35) : Colors.grey[300]!,
+        ),
+        focusedBorder: _border(
+          isDark ? AppColors.purpleAccent : const Color(0xFF3B82F6),
+        ),
         errorBorder: _border(Colors.redAccent),
         focusedErrorBorder: _border(Colors.redAccent),
         suffixIcon: suffixIcon,
@@ -685,19 +742,22 @@ class _GradientButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onPressed,
         child: Ink(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF9B5DE5), Color(0xFF7C3AED)],
+              colors: isDark
+                  ? [const Color(0xFF9B5DE5), const Color(0xFF7C3AED)] // Purple gradient for dark
+                  : [const Color(0xFF3B82F6), const Color(0xFF2563EB)], // Blue gradient for light
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
             ),
-            borderRadius: BorderRadius.all(ui.Radius.circular(12)),
+            borderRadius: const BorderRadius.all(ui.Radius.circular(12)),
           ),
           child: Center(
             child: Text(
@@ -721,6 +781,7 @@ class _GoogleSignInButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
@@ -728,17 +789,21 @@ class _GoogleSignInButton extends StatelessWidget {
         onTap: onPressed,
         child: Ink(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? Colors.white : Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF2A2E35)),
+            border: Border.all(
+              color: isDark
+                  ? const Color(0xFF2A2E35)
+                  : Colors.grey[300]!,
+            ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.g_mobiledata,
-                color: Colors.red,
-                size: 20,
+              Image.asset(
+                'assets/images/google.png',
+                width: 20,
+                height: 20,
               ),
               const SizedBox(width: 12),
               const Text(
