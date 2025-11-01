@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/logger.dart';
 import '../models/chat.dart';
 import '../models/chat_message.dart';
 import 'firestore_paths.dart';
@@ -23,18 +24,31 @@ class ChatService {
     final key = parts.join('_');
     final doc = _db.collection(FsPaths.chats).doc(key);
     
-    // Check if chat exists first
-    final snapshot = await doc.get();
-    if (!snapshot.exists) {
-      // Only set initial data if chat doesn't exist yet
-      await doc.set({
-        'participants': parts,
-        'lastMessageTime': DateTime.now().millisecondsSinceEpoch,
-        'lastMessage': null,
-      });
+    try {
+      // Check if document already exists
+      final docSnap = await doc.get();
+      
+      if (!docSnap.exists) {
+        // Only set lastMessageTime if document is new
+        await doc.set({
+          'participants': parts,
+          'lastMessageTime': null, // No messages yet
+          'lastMessage': null,
+        });
+        AppLogger.debug('Chat document created: $key for participants: $parts');
+      } else {
+        // Document exists, just ensure participants are set (don't update timestamp)
+        await doc.set({
+          'participants': parts,
+        }, SetOptions(merge: true));
+        AppLogger.debug('Chat document ensured (already exists): $key for participants: $parts');
+      }
+      
+      return key;
+    } catch (e, stackTrace) {
+      AppLogger.firebaseError('Failed to ensure chat exists for users: $uidA, $uidB', e, stackTrace);
+      rethrow;
     }
-    // If chat exists, don't update anything - just return the key
-    return key;
   }
 
   Stream<List<ChatMessage>> watchMessages(String chatId) {
@@ -47,7 +61,12 @@ class ChatService {
           (snap) => snap.docs
               .map((d) => ChatMessage.fromMap(d.id, d.data()))
               .toList(),
-        );
+        )
+        .handleError((error, stackTrace) {
+          AppLogger.firebaseError('watchMessages stream error for chatId: $chatId', error, stackTrace);
+          // Re-throw to be caught by StreamBuilder
+          throw error;
+        });
   }
 
   Future<void> sendText({

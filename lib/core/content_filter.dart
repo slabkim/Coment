@@ -3,7 +3,7 @@ class ContentFilter {
   // AniList content filtering
   static const bool allowAdultContent = false;
   
-  // MangaDex content rating filters
+  // Content rating filters
   static const List<String> allowedContentRatings = [
     'safe', // Konten yang aman untuk semua umur
     // 'suggestive', // Dihapus untuk filter lebih ketat

@@ -488,7 +488,7 @@ class _UserResults extends StatelessWidget {
                   context,
                   'view user profile',
                 );
-                if (success) {
+                if (success && context.mounted) {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => UserPublicProfileScreen(userId: u.id),

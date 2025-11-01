@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/logger.dart';
 
 class ChatHistoryService {
   final FirebaseFirestore _db;
@@ -14,6 +16,10 @@ class ChatHistoryService {
       if (!d.exists) return null;
       final v = d.data()?['lastReadAt'];
       return (v is num) ? v.toInt() : null;
+    }).handleError((error, stackTrace) {
+      AppLogger.firebaseError('watchLastRead failed for chatId: $chatId, userId: $userId', error, stackTrace);
+      // Don't rethrow - stream will emit null if document doesn't exist
+      // This allows the UI to continue working even if permission is denied
     });
   }
 

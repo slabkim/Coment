@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/logger.dart';
 import 'xp_service.dart';
 
 class ReadingStatusService {
@@ -34,11 +35,6 @@ class ReadingStatusService {
     required String titleId,
     required String status,
   }) async {
-    print('🔄 ReadingStatusService.setStatus called:');
-    print('   userId: $userId');
-    print('   titleId: $titleId');
-    print('   status: $status');
-    
     try {
       final q = await _db
           .collection('reading_status')
@@ -47,28 +43,22 @@ class ReadingStatusService {
           .limit(1)
           .get();
       
-      print('   Query result: ${q.docs.length} documents found');
-      
       String? oldStatus;
       
       if (q.docs.isNotEmpty) {
-        print('   Updating existing document: ${q.docs.first.id}');
         oldStatus = q.docs.first.data()[fieldStatus] as String?;
         
         await _db.collection('reading_status').doc(q.docs.first.id).update({
           fieldStatus: status,
           'updatedAt': DateTime.now().millisecondsSinceEpoch,
         });
-        print('   ✅ Document updated successfully');
       } else {
-        print('   Creating new document');
-        final docRef = await _db.collection('reading_status').add({
+        await _db.collection('reading_status').add({
           'userId': userId,
           'titleId': titleId,
           fieldStatus: status,
           'createdAt': DateTime.now().millisecondsSinceEpoch,
         });
-        print('   ✅ New document created with ID: ${docRef.id}');
       }
       
       // Award XP for completing a comic (if status changed to completed)
@@ -78,8 +68,8 @@ class ReadingStatusService {
         // Award smaller XP for updating reading status
         await _xpService.awardUpdateReadingStatus(userId, titleId);
       }
-    } catch (e) {
-      print('   ❌ Error in setStatus: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('Error in setStatus', e, stackTrace);
       rethrow;
     }
   }

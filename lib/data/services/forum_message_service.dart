@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
+import '../../core/logger.dart';
 import '../models/forum_message.dart';
 
 /// Service for managing forum messages
@@ -64,11 +64,11 @@ class ForumMessageService {
         'messageCount': FieldValue.increment(1),
       });
       
-      debugPrint('Message sent to forum $forumId: ${message.id}');
+      AppLogger.debug('Message sent to forum $forumId: ${message.id}');
       
       return message.id;
-    } catch (e) {
-      debugPrint('Error sending message: $e');
+    } catch (e, stackTrace) {
+      AppLogger.firebaseError('sending message', e, stackTrace);
       rethrow;
     }
   }
@@ -83,9 +83,9 @@ class ForumMessageService {
         'messageCount': FieldValue.increment(-1),
       });
       
-      debugPrint('Message deleted: $messageId');
-    } catch (e) {
-      debugPrint('Error deleting message: $e');
+      AppLogger.debug('Message deleted: $messageId');
+    } catch (e, stackTrace) {
+      AppLogger.firebaseError('deleting message', e, stackTrace);
       rethrow;
     }
   }
@@ -118,8 +118,8 @@ class ForumMessageService {
       return querySnapshot.docs
           .map((doc) => ForumMessage.fromMap(doc.id, doc.data()))
           .toList();
-    } catch (e) {
-      debugPrint('Error getting pinned messages: $e');
+    } catch (e, stackTrace) {
+      AppLogger.firebaseError('getting pinned messages', e, stackTrace);
       return [];
     }
   }
@@ -147,8 +147,8 @@ class ForumMessageService {
       
       final data = forumDoc.data();
       return (data?['messageCount'] as num?)?.toInt() ?? 0;
-    } catch (e) {
-      debugPrint('Error getting message count: $e');
+    } catch (e, stackTrace) {
+      AppLogger.firebaseError('getting message count', e, stackTrace);
       return 0;
     }
   }
@@ -187,9 +187,9 @@ class ForumMessageService {
       
       await messageRef.update({'reactions': reactions});
       
-      debugPrint('Reaction toggled on message $messageId: $emoji by $userId');
-    } catch (e) {
-      debugPrint('Error toggling reaction: $e');
+      AppLogger.debug('Reaction toggled on message $messageId: $emoji by $userId');
+    } catch (e, stackTrace) {
+      AppLogger.firebaseError('toggling reaction', e, stackTrace);
       rethrow;
     }
   }

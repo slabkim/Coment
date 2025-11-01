@@ -60,7 +60,10 @@ class ChatListScreen extends StatelessWidget {
                         final displayName =
                             profile?.username ?? profile?.handle ?? otherId;
                         final photo = profile?.photoUrl;
-                        final subtitle = c.lastMessage ?? 'Say hello!';
+                        // Only show "Say hello!" if chat has no messages at all (both lastMessage and lastMessageTime are null)
+                        final subtitle = (c.lastMessage == null && c.lastMessageTime == null) 
+                            ? 'Say hello!' 
+                            : (c.lastMessage ?? '');
                         final timeLabel = _formatTime(c.lastMessageTime);
                         return ListTile(
                           leading: CircleAvatar(
@@ -107,7 +110,8 @@ class ChatListScreen extends StatelessWidget {
                               StreamBuilder<int?>(
                                 stream: history.watchLastRead(c.id, uid),
                                 builder: (context, s3) {
-                                  final lastRead = s3.data ?? 0;
+                                  // Handle error gracefully - treat as unread if error
+                                  final lastRead = s3.hasError ? 0 : (s3.data ?? 0);
                                   final lastMsg =
                                       c
                                           .lastMessageTime

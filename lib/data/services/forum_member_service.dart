@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
+import '../../core/logger.dart';
 import '../models/forum_member.dart';
 import '../models/user_profile.dart';
 
@@ -30,15 +30,12 @@ class ForumMemberService {
     if (lastOperation != null) {
       final timeSinceLastOp = DateTime.now().difference(lastOperation);
       if (timeSinceLastOp < _cooldownDuration) {
-        final remainingMs = (_cooldownDuration - timeSinceLastOp).inMilliseconds;
-        debugPrint('⏳ Cooldown active for forum $forumId (${remainingMs}ms remaining)');
         return;
       }
     }
     
     // Prevent duplicate concurrent requests
     if (_ongoingOperations.contains(operationKey)) {
-      debugPrint('Join operation already in progress for $operationKey');
       return;
     }
     
@@ -51,8 +48,7 @@ class ForumMemberService {
       // Use transaction for atomic check-and-set (reads always from server in transactions)
       await _db.runTransaction((transaction) async {
         // Read forum first to get latest member count
-        final forumDoc = await transaction.get(_db.collection('forums').doc(forumId));
-        final currentMemberCount = forumDoc.data()?['memberCount'] ?? 0;
+        await transaction.get(_db.collection('forums').doc(forumId));
         
         // Check if already a member (transaction reads from server, not cache)
         final memberDoc = await transaction.get(_db.collection('forum_members').doc(memberDocId));
@@ -67,16 +63,14 @@ class ForumMemberService {
         
         // If document truly exists with valid data, skip
         if (memberExists) {
-          debugPrint('❌ User $userId already member of forum $forumId (memberCount: $currentMemberCount)');
           return; // Already joined, do nothing
         }
         
         // If corrupted/incomplete document exists, log and overwrite
         if (memberDoc.exists && !hasRequiredFields) {
-          debugPrint('⚠️ Corrupted member document found for $userId in forum $forumId (fields: ${memberData?.keys}). Will overwrite.');
+          AppLogger.warning('Corrupted member document found for $userId in forum $forumId (fields: ${memberData?.keys}). Will overwrite.');
         }
         
-        debugPrint('➕ Adding user $userId to forum $forumId (current memberCount: $currentMemberCount)');
         
         // Check if developer for auto-moderator
         final userDoc = await transaction.get(_db.collection('users').doc(userId));
@@ -112,12 +106,11 @@ class ForumMemberService {
         );
         transaction.set(_db.collection('user_forums').doc(subscriptionDocId), subscription.toMap());
         
-        debugPrint('✅ User $userId joined forum $forumId as ${role.name} (memberCount: $currentMemberCount → ${currentMemberCount + 1})');
       });
       
       // Don't wait here - cooldown will prevent next operation
     } catch (e) {
-      debugPrint('Error joining forum: $e');
+      AppLogger.firebaseError('joining forum', e);
       rethrow;
     } finally {
       _ongoingOperations.remove(operationKey);
@@ -134,15 +127,12 @@ class ForumMemberService {
     if (lastOperation != null) {
       final timeSinceLastOp = DateTime.now().difference(lastOperation);
       if (timeSinceLastOp < _cooldownDuration) {
-        final remainingMs = (_cooldownDuration - timeSinceLastOp).inMilliseconds;
-        debugPrint('⏳ Cooldown active for forum $forumId (${remainingMs}ms remaining)');
         return;
       }
     }
     
     // Prevent duplicate concurrent requests
     if (_ongoingOperations.contains(operationKey)) {
-      debugPrint('Leave operation already in progress for $operationKey');
       return;
     }
     
@@ -155,8 +145,7 @@ class ForumMemberService {
       // Use transaction for atomic check-and-delete (reads always from server in transactions)
       await _db.runTransaction((transaction) async {
         // Read forum first to get latest member count
-        final forumDoc = await transaction.get(_db.collection('forums').doc(forumId));
-        final currentMemberCount = forumDoc.data()?['memberCount'] ?? 0;
+        await transaction.get(_db.collection('forums').doc(forumId));
         
         // Check if actually a member (transaction reads from server, not cache)
         final memberDoc = await transaction.get(_db.collection('forum_members').doc(memberDocId));
@@ -164,7 +153,6 @@ class ForumMemberService {
         
         // Document doesn't exist at all
         if (!memberDoc.exists) {
-          debugPrint('❌ User $userId not a member of forum $forumId (memberCount: $currentMemberCount)');
           return; // Not a member, do nothing
         }
         
@@ -176,7 +164,7 @@ class ForumMemberService {
         
         // If corrupted document, still allow delete (clean up) but don't decrement count
         if (!hasRequiredFields) {
-          debugPrint('⚠️ Cleaning up corrupted member document for $userId in forum $forumId (fields: ${memberData?.keys})');
+          AppLogger.warning('Cleaning up corrupted member document for $userId in forum $forumId (fields: ${memberData?.keys})');
           transaction.delete(_db.collection('forum_members').doc(memberDocId));
           
           // Also clean up subscription if exists
@@ -185,7 +173,6 @@ class ForumMemberService {
           return; // Don't decrement count as it's corrupted data
         }
         
-        debugPrint('➖ Removing user $userId from forum $forumId (current memberCount: $currentMemberCount)');
         
         // Remove member
         transaction.delete(_db.collection('forum_members').doc(memberDocId));
@@ -201,12 +188,11 @@ class ForumMemberService {
         final subscriptionDocId = '${userId}_$forumId';
         transaction.delete(_db.collection('user_forums').doc(subscriptionDocId));
         
-        debugPrint('✅ User $userId left forum $forumId (memberCount: $currentMemberCount → ${currentMemberCount - 1})');
       });
       
       // Don't wait here - cooldown will prevent next operation
     } catch (e) {
-      debugPrint('Error leaving forum: $e');
+      AppLogger.firebaseError('leaving forum', e);
       rethrow;
     } finally {
       _ongoingOperations.remove(operationKey);
@@ -220,7 +206,7 @@ class ForumMemberService {
       final doc = await _db.collection('forum_members').doc(memberDocId).get();
       return doc.exists;
     } catch (e) {
-      debugPrint('Error checking membership: $e');
+      AppLogger.firebaseError('checking membership', e);
       return false;
     }
   }
@@ -249,7 +235,7 @@ class ForumMemberService {
           .map((doc) => ForumMember.fromMap(doc.data()))
           .toList();
     } catch (e) {
-      debugPrint('Error getting members: $e');
+      AppLogger.firebaseError('getting members', e);
       return [];
     }
   }
@@ -269,7 +255,7 @@ class ForumMemberService {
           })
           .toList();
     } catch (e) {
-      debugPrint('Error getting user forums: $e');
+      AppLogger.firebaseError('getting user forums', e);
       return [];
     }
   }
@@ -318,7 +304,7 @@ class ForumMemberService {
         }, SetOptions(merge: true));
       }
     } catch (e) {
-      debugPrint('Error marking as read: $e');
+      AppLogger.firebaseError('marking as read', e);
     }
   }
 
@@ -333,7 +319,7 @@ class ForumMemberService {
       final data = doc.data();
       return (data?['unreadCount'] as num?)?.toInt() ?? 0;
     } catch (e) {
-      debugPrint('Error getting unread count: $e');
+      AppLogger.firebaseError('getting unread count', e);
       return 0;
     }
   }
@@ -346,9 +332,8 @@ class ForumMemberService {
         'muted': mute,
       });
       
-      debugPrint('Forum $forumId ${mute ? "muted" : "unmuted"} for user $userId');
     } catch (e) {
-      debugPrint('Error toggling mute: $e');
+      AppLogger.firebaseError('toggling mute', e);
       rethrow;
     }
   }

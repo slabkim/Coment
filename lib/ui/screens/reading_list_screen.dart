@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
-import '../../core/constants.dart';
 import '../../data/services/reading_status_service.dart';
 import '../../state/item_provider.dart';
 import '../../data/models/nandogami_item.dart';

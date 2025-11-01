@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter/services.dart';
-import '../../data/services/user_service.dart';
-import '../../../core/constants.dart';
+import '../widgets/auth/auth_header.dart';
+import '../widgets/auth/auth_tab_button.dart';
+import '../widgets/auth/auth_login_form.dart';
+import '../widgets/auth/auth_signup_form.dart';
+import '../widgets/auth/auth_gradient_button.dart';
+import '../widgets/auth/auth_google_sign_in_button.dart';
+import '../widgets/auth/auth_helpers.dart';
 
 class LoginRegisterScreen extends StatefulWidget {
   const LoginRegisterScreen({super.key});
@@ -41,166 +42,6 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
     super.dispose();
   }
 
-  // ================= FIREBASE AUTH (opsional) =================
-  Future<void> _doLogin() async {
-    if (!_loginKey.currentState!.validate()) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailC.text.trim(),
-        password: _passwordC.text.trim(),
-      );
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop(true); // Return true untuk success
-      }
-    } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? 'Login gagal');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _doSignup() async {
-    if (!_signupKey.currentState!.validate()) return;
-    if (!_agreeTerms.value) {
-      setState(() => _error = 'Kamu harus menyetujui Syarat & Privasi.');
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailC.text.trim(),
-        password: _passwordC.text.trim(),
-      );
-      // (opsional) update displayName
-      await FirebaseAuth.instance.currentUser?.updateDisplayName(
-        _usernameC.text.trim(),
-      );
-      final user = cred.user;
-      if (user != null) {
-        await UserService().ensureUserDoc(
-          uid: user.uid,
-          email: user.email ?? _emailC.text.trim(),
-          displayName: _usernameC.text.trim(),
-          photoUrl: user.photoURL,
-        );
-      }
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop(true); // Return true untuk success
-      }
-    } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? 'Registrasi gagal');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _forgotPassword() async {
-    final email = _emailC.text.trim();
-    if (email.isEmpty) {
-      setState(() => _error = 'Masukkan email dulu untuk reset password.');
-      return;
-    }
-    try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tautan reset dikirim ke email kamu.')),
-        );
-      }
-    } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? 'Gagal mengirim tautan reset.');
-    }
-  }
-
-  Future<void> _signInWithGoogle() async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      debugPrint('=== GOOGLE SIGN-IN DEBUG ===');
-      debugPrint('Starting Google Sign-In process...');
-      
-      // Configure Google Sign-In
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        scopes: ['email', 'profile'],
-      );
-      
-      debugPrint('GoogleSignIn configured without serverClientId (using google-services.json)');
-      
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      debugPrint('Google Sign-In result: ${googleUser != null ? "Success" : "User cancelled"}');
-      
-      if (googleUser == null) {
-        debugPrint('User cancelled Google Sign-In');
-        setState(() => _busy = false);
-        return;
-      }
-
-      debugPrint('Google User ID: ${googleUser.id}');
-      debugPrint('Google User Email: ${googleUser.email}');
-      debugPrint('Google User Display Name: ${googleUser.displayName}');
-      
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      debugPrint('Google Auth tokens received');
-      debugPrint('Access Token: ${googleAuth.accessToken != null ? "Present" : "Missing"}');
-      debugPrint('ID Token: ${googleAuth.idToken != null ? "Present" : "Missing"}');
-      
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-      debugPrint('Firebase credential created');
-
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      final user = userCredential.user;
-      debugPrint('Firebase Auth successful: ${user != null}');
-      
-      if (user != null) {
-        debugPrint('Creating user document...');
-        await UserService().ensureUserDoc(
-          uid: user.uid,
-          email: user.email ?? '',
-          displayName: user.displayName ?? user.email?.split('@').first ?? 'User',
-          photoUrl: user.photoURL,
-        );
-        debugPrint('User document created successfully');
-      }
-      
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop(true); // Return true untuk success
-      }
-      debugPrint('=== GOOGLE SIGN-IN SUCCESS ===');
-    } catch (e) {
-      debugPrint('=== GOOGLE SIGN-IN ERROR ===');
-      debugPrint('Google Sign-In Error: $e');
-      debugPrint('Error type: ${e.runtimeType}');
-      if (e is PlatformException) {
-        debugPrint('Platform error code: ${e.code}');
-        debugPrint('Platform error message: ${e.message}');
-        debugPrint('Platform error details: ${e.details}');
-        
-        // Specific error handling for ApiException: 10
-        if (e.code == 'sign_in_failed' && e.message?.contains('ApiException: 10') == true) {
-          debugPrint('DEVELOPER_ERROR: This usually means:');
-          debugPrint('1. Package name mismatch between Firebase and Google Cloud Console');
-          debugPrint('2. SHA-1 fingerprint mismatch');
-          debugPrint('3. OAuth Client ID configuration issue');
-          debugPrint('4. OAuth Consent Screen not properly configured');
-        }
-      }
-      setState(() => _error = 'Google Sign-In gagal: ${e.toString()}');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
 
   // ================== UI ==================
   @override
@@ -220,48 +61,8 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   SizedBox(height: MediaQuery.paddingOf(context).top + 16),
-                  // Avatar + Logo
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.light
-                          ? const Color(0xFF3B82F6).withOpacity(0.1) // Light blue for light mode
-                          : const Color(0xFF3B2A58), // Purple for dark mode
-                      shape: BoxShape.circle,
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Center(
-                      child: Image.asset(
-                        'assets/images/comentlogo.png',
-                        width: 56,
-                        height: 56,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // App name
-                  Text(
-                    AppConst.appName,
-                    style: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.light
-                          ? const Color(0xFF3B82F6) // Blue for light mode
-                          : AppColors.purpleAccent, // Purple for dark mode
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  // Subtitle
-                  Text(
-                    'Your personal manga, manhwa, and manhua recommendation app',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 14,
-                    ),
-                  ),
+                  // Header (Avatar + Logo + App Name)
+                  const AuthHeader(),
                   const SizedBox(height: 28),
 
                   // Tabs
@@ -278,14 +79,14 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                     child: Row(
                       children: [
                         Expanded(
-                          child: _TabButton(
+                          child: AuthTabButton(
                             text: 'Login',
                             active: _isLogin,
                             onTap: () => setState(() => _isLogin = true),
                           ),
                         ),
                         Expanded(
-                          child: _TabButton(
+                          child: AuthTabButton(
                             text: 'Sign Up',
                             active: !_isLogin,
                             onTap: () => setState(() => _isLogin = false),
@@ -309,15 +110,19 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
 
                   // Forms
                   if (_isLogin)
-                    _LoginForm(
+                    AuthLoginForm(
                       formKey: _loginKey,
                       emailC: _emailC,
                       passwordC: _passwordC,
                       rememberMe: _rememberMe,
-                      onForgot: _forgotPassword,
+                      onForgot: () => AuthHelpers.forgotPassword(
+                        context,
+                        email: _emailC.text,
+                        setError: (error) => setState(() => _error = error),
+                      ),
                     )
                   else
-                    _SignupForm(
+                    AuthSignupForm(
                       formKey: _signupKey,
                       usernameC: _usernameC,
                       emailC: _emailC,
@@ -340,9 +145,34 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: 50,
-                    child: _GradientButton(
+                    child: AuthGradientButton(
                       text: _isLogin ? 'Log In' : 'Sign Up',
-                      onPressed: _isLogin ? _doLogin : _doSignup,
+                      onPressed: _isLogin
+                          ? () {
+                              if (!_loginKey.currentState!.validate()) return;
+                              AuthHelpers.doLogin(
+                                context,
+                                email: _emailC.text,
+                                password: _passwordC.text,
+                                setBusy: (busy) => setState(() => _busy = busy),
+                                setError: (error) => setState(() => _error = error),
+                              );
+                            }
+                          : () {
+                              if (!_signupKey.currentState!.validate()) return;
+                              if (!_agreeTerms.value) {
+                                setState(() => _error = 'Kamu harus menyetujui Syarat & Privasi.');
+                                return;
+                              }
+                              AuthHelpers.doSignup(
+                                context,
+                                username: _usernameC.text,
+                                email: _emailC.text,
+                                password: _passwordC.text,
+                                setBusy: (busy) => setState(() => _busy = busy),
+                                setError: (error) => setState(() => _error = error),
+                              );
+                            },
                     ),
                   ),
 
@@ -377,8 +207,12 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: 50,
-                    child: _GoogleSignInButton(
-                      onPressed: _signInWithGoogle,
+                    child: AuthGoogleSignInButton(
+                      onPressed: () => AuthHelpers.signInWithGoogle(
+                        context,
+                        setBusy: (busy) => setState(() => _busy = busy),
+                        setError: (error) => setState(() => _error = error),
+                      ),
                     ),
                   ),
 
@@ -406,416 +240,6 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                 ),
               ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// =================== WIDGETS ===================
-
-class _TabButton extends StatelessWidget {
-  final String text;
-  final bool active;
-  final VoidCallback onTap;
-  const _TabButton({
-    required this.text,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return InkWell(
-      borderRadius: BorderRadius.circular(10),
-      onTap: onTap,
-      child: Ink(
-        decoration: BoxDecoration(
-          color: active
-              ? (isDark ? AppColors.purpleAccent : const Color(0xFF3B82F6)) // Purple for dark, blue for light
-              : (isDark ? const Color(0xFF121316) : Colors.grey[200]), // Dark grey for dark, light grey for light
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Center(
-          child: Text(
-            text,
-            style: TextStyle(
-              color: active
-                  ? (isDark ? Colors.white : Colors.black87) // White for dark, black for light when active
-                  : (isDark ? const Color(0xFF8E8E8E) : Colors.grey[600]), // Grey for inactive
-              fontWeight: active ? FontWeight.bold : FontWeight.w500,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LoginForm extends StatefulWidget {
-  final GlobalKey<FormState> formKey;
-  final TextEditingController emailC;
-  final TextEditingController passwordC;
-  final ValueNotifier<bool> rememberMe;
-  final VoidCallback onForgot;
-
-  const _LoginForm({
-    required this.formKey,
-    required this.emailC,
-    required this.passwordC,
-    required this.rememberMe,
-    required this.onForgot,
-  });
-
-  @override
-  State<_LoginForm> createState() => _LoginFormState();
-}
-
-class _LoginFormState extends State<_LoginForm> {
-  bool _obscure = true;
-
-  @override
-  Widget build(BuildContext context) {
-    return Form(
-      key: widget.formKey,
-      child: Column(
-        children: [
-          _OutlinedField(
-            controller: widget.emailC,
-            hint: 'Email',
-            keyboardType: TextInputType.emailAddress,
-            validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Email wajib diisi';
-              if (!RegExp(r'^\S+@\S+\.\S+$').hasMatch(v.trim())) {
-                return 'Email tidak valid';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 14),
-          _OutlinedField(
-            controller: widget.passwordC,
-            hint: 'Password',
-            obscureText: _obscure,
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscure ? Icons.visibility_off : Icons.visibility,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              onPressed: () => setState(() => _obscure = !_obscure),
-            ),
-            validator: (v) {
-              if (v == null || v.isEmpty) return 'Password wajib diisi';
-              return null;
-            },
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              ValueListenableBuilder<bool>(
-                valueListenable: widget.rememberMe,
-                builder: (_, val, __) {
-                  final isDark = Theme.of(context).brightness == Brightness.dark;
-                  return Checkbox(
-                    value: val,
-                    onChanged: (x) => widget.rememberMe.value = x ?? false,
-                    side: BorderSide(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    checkColor: Colors.white,
-                    activeColor: isDark
-                        ? AppColors.purpleAccent
-                        : const Color(0xFF3B82F6),
-                  );
-                },
-              ),
-              Text(
-                'Remember me',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: widget.onForgot,
-                child: Text(
-                  'Forgot password?',
-                  style: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? AppColors.purpleAccent
-                        : const Color(0xFF3B82F6),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SignupForm extends StatefulWidget {
-  final GlobalKey<FormState> formKey;
-  final TextEditingController usernameC;
-  final TextEditingController emailC;
-  final TextEditingController passwordC;
-  final ValueNotifier<bool> agreeTerms;
-
-  const _SignupForm({
-    required this.formKey,
-    required this.usernameC,
-    required this.emailC,
-    required this.passwordC,
-    required this.agreeTerms,
-  });
-
-  @override
-  State<_SignupForm> createState() => _SignupFormState();
-}
-
-class _SignupFormState extends State<_SignupForm> {
-  bool _obscure = true;
-
-  @override
-  Widget build(BuildContext context) {
-    return Form(
-      key: widget.formKey,
-      child: Column(
-        children: [
-          _OutlinedField(
-            controller: widget.usernameC,
-            hint: 'Username',
-            textInputAction: TextInputAction.next,
-            validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Username wajib diisi';
-              if (v.trim().length < 3) return 'Minimal 3 karakter';
-              return null;
-            },
-          ),
-          const SizedBox(height: 12),
-          _OutlinedField(
-            controller: widget.emailC,
-            hint: 'Email',
-            keyboardType: TextInputType.emailAddress,
-            validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Email wajib diisi';
-              if (!RegExp(r'^\S+@\S+\.\S+$').hasMatch(v.trim())) {
-                return 'Email tidak valid';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 12),
-          _OutlinedField(
-            controller: widget.passwordC,
-            hint: 'Password',
-            obscureText: _obscure,
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscure ? Icons.visibility_off : Icons.visibility,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              onPressed: () => setState(() => _obscure = !_obscure),
-            ),
-            validator: (v) {
-              if (v == null || v.isEmpty) return 'Password wajib diisi';
-              if (v.length < 8) return 'Minimal 8 karakter';
-              return null;
-            },
-          ),
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Password must be at least 8 characters long',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
-                fontSize: 13,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              ValueListenableBuilder<bool>(
-                valueListenable: widget.agreeTerms,
-                builder: (_, val, __) {
-                  final isDark = Theme.of(context).brightness == Brightness.dark;
-                  return Checkbox(
-                    value: val,
-                    onChanged: (x) => widget.agreeTerms.value = x ?? false,
-                    side: BorderSide(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    checkColor: Colors.white,
-                    activeColor: isDark
-                        ? AppColors.purpleAccent
-                        : const Color(0xFF3B82F6),
-                  );
-                },
-              ),
-              Expanded(
-                child: Text(
-                  'I agree to the Terms of Service and Privacy Policy',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OutlinedField extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final TextInputType? keyboardType;
-  final bool obscureText;
-  final Widget? suffixIcon;
-  final String? Function(String?)? validator;
-  final TextInputAction? textInputAction;
-
-  const _OutlinedField({
-    required this.controller,
-    required this.hint,
-    this.keyboardType,
-    this.obscureText = false,
-    this.suffixIcon,
-    this.validator,
-    this.textInputAction,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return TextFormField(
-      controller: controller,
-      style: TextStyle(
-        color: isDark ? Colors.white : Colors.black87,
-      ),
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      validator: validator,
-      textInputAction: textInputAction,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(
-          color: isDark ? Colors.white54 : Colors.black45,
-        ),
-        filled: true,
-        fillColor: isDark
-            ? const Color(0xFF121316) // Dark for dark mode
-            : Colors.grey[100], // Light grey for light mode
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 14,
-        ),
-        enabledBorder: _border(
-          isDark ? const Color(0xFF2A2E35) : Colors.grey[300]!,
-        ),
-        focusedBorder: _border(
-          isDark ? AppColors.purpleAccent : const Color(0xFF3B82F6),
-        ),
-        errorBorder: _border(Colors.redAccent),
-        focusedErrorBorder: _border(Colors.redAccent),
-        suffixIcon: suffixIcon,
-      ),
-    );
-  }
-
-  OutlineInputBorder _border(Color color) => OutlineInputBorder(
-    borderRadius: BorderRadius.circular(10),
-    borderSide: BorderSide(color: color),
-  );
-}
-
-class _GradientButton extends StatelessWidget {
-  final String text;
-  final VoidCallback onPressed;
-  const _GradientButton({required this.text, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Material(
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onPressed,
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: isDark
-                  ? [const Color(0xFF9B5DE5), const Color(0xFF7C3AED)] // Purple gradient for dark
-                  : [const Color(0xFF3B82F6), const Color(0xFF2563EB)], // Blue gradient for light
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-            borderRadius: const BorderRadius.all(ui.Radius.circular(12)),
-          ),
-          child: Center(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GoogleSignInButton extends StatelessWidget {
-  final VoidCallback onPressed;
-  const _GoogleSignInButton({required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Material(
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onPressed,
-        child: Ink(
-          decoration: BoxDecoration(
-            color: isDark ? Colors.white : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDark
-                  ? const Color(0xFF2A2E35)
-                  : Colors.grey[300]!,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Image.asset(
-                'assets/images/google.png',
-                width: 20,
-                height: 20,
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Continue with Google',
-                style: TextStyle(
-                  color: Colors.black87,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

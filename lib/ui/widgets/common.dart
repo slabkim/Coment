@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
 
+/// A widget that displays a section title with consistent styling.
 class SectionTitle extends StatelessWidget {
   final String text;
   const SectionTitle(this.text, {super.key});
@@ -24,6 +25,7 @@ class SectionTitle extends StatelessWidget {
   }
 }
 
+/// A styled list tile widget with dark theme support and a divider.
 class DarkListTile extends StatelessWidget {
   final Widget? leading;
   final Widget? title;
@@ -58,6 +60,7 @@ class DarkListTile extends StatelessWidget {
   }
 }
 
+/// A styled chip widget for displaying tags.
 class TagChip extends StatelessWidget {
   final String text;
   final VoidCallback? onPressed;

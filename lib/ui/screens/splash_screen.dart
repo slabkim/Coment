@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants.dart';
+import '../../core/logger.dart';
 import '../../state/item_provider.dart';
 import '../../state/theme_provider.dart';
 import '../../app.dart';
@@ -21,7 +22,6 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _fadeController;
   late AnimationController _loadingController;
   late Animation<double> _fadeAnimation;
-  late Animation<double> _loadingAnimation;
 
   @override
   void initState() {
@@ -43,14 +43,6 @@ class _SplashScreenState extends State<SplashScreen>
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _fadeController,
-      curve: Curves.easeInOut,
-    ));
-
-    _loadingAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _loadingController,
       curve: Curves.easeInOut,
     ));
 
@@ -82,16 +74,19 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _preloadData() async {
     try {
       // Load ThemeProvider first
+      if (!mounted) return;
       final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
       await themeProvider.load();
       
       // Get ItemProvider dari context
+      if (!mounted) return;
       final itemProvider = Provider.of<ItemProvider>(context, listen: false);
       
       // Start loading data di background
       await itemProvider.init();
-    } catch (e) {
-      // Silently ignore preload errors
+    } catch (e, stackTrace) {
+      // Log preload errors but don't block app startup
+      AppLogger.warning('Failed to preload data during splash screen', e, stackTrace);
     }
   }
 
@@ -166,7 +161,6 @@ class _SplashContentState extends State<_SplashContent>
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
     
     // Safe access to ThemeProvider with listening

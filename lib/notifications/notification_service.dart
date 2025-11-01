@@ -2,10 +2,10 @@ import 'dart:io' show Platform;
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/logger.dart';
 
 class AppNotificationService {
   AppNotificationService._();
@@ -55,8 +55,8 @@ class AppNotificationService {
           });
         }
       }
-    } catch (e) {
-      debugPrint('Error checking launch details: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('Error checking launch details', e, stackTrace);
     }
 
     if (!kIsWeb && Platform.isAndroid) {
@@ -82,8 +82,10 @@ class AppNotificationService {
         if (!enabled) {
           await androidPlugin?.requestNotificationsPermission();
         }
-      } catch (_) {
-        // Silently ignore if method not available on older plugin versions/SDKs.
+      } catch (e, stackTrace) {
+        // Expected: method not available on older plugin versions/SDKs.
+        // Log at debug level as this is expected behavior for backward compatibility.
+        AppLogger.debug('Notification permission check not available (expected on older SDKs)', e, stackTrace);
       }
     }
 
@@ -250,8 +252,8 @@ class AppNotificationService {
         final data = jsonDecode(response.payload!);
         final message = RemoteMessage(data: Map<String, dynamic>.from(data));
         onNotificationTap?.call(message);
-      } catch (e) {
-        debugPrint('Error handling notification tap: $e');
+      } catch (e, stackTrace) {
+        AppLogger.error('Error handling notification tap', e, stackTrace);
       }
     }
   }
@@ -289,8 +291,8 @@ class AppNotificationService {
           }
         });
       }
-    } catch (e) {
-      debugPrint('Error loading message cache: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('Error loading message cache', e, stackTrace);
     }
   }
   
@@ -300,8 +302,8 @@ class AppNotificationService {
       final prefs = await SharedPreferences.getInstance();
       final cacheJson = jsonEncode(_messageCache);
       await prefs.setString(_messageCacheKey, cacheJson);
-    } catch (e) {
-      debugPrint('Error saving message cache: $e');
+    } catch (e, stackTrace) {
+      AppLogger.error('Error saving message cache', e, stackTrace);
     }
   }
   

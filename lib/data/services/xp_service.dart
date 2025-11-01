@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
+import '../../core/logger.dart';
 import '../models/user_class.dart';
 import '../models/user_profile.dart';
 
@@ -22,7 +22,6 @@ class XPService {
         final userDoc = await transaction.get(userRef);
         
         if (!userDoc.exists) {
-          debugPrint('User $userId not found, cannot award XP');
           return;
         }
         
@@ -39,16 +38,15 @@ class XPService {
         
         // Log class upgrade
         if (newClass.name != oldClass.name) {
-          debugPrint('🎉 User $userId ranked up: ${oldClass.name} → ${newClass.name}!');
+          AppLogger.debug('User $userId ranked up: ${oldClass.name} → ${newClass.name}!');
           
           // Optionally send notification (implement later if needed)
           // _sendClassUpgradeNotification(userId, newClass);
         }
         
-        debugPrint('XP awarded to $userId: +$amount ($reason) | Total: $newXP | Class: ${newClass.name}');
       });
-    } catch (e) {
-      debugPrint('Error awarding XP: $e');
+    } catch (e, stackTrace) {
+      AppLogger.firebaseError('awarding XP', e, stackTrace);
     }
   }
 
@@ -112,7 +110,6 @@ class XPService {
       if (lastLogin != null) {
         final lastLoginDate = lastLogin.toDate();
         if (now.difference(lastLoginDate).inHours < 24) {
-          debugPrint('Daily login already claimed for $userId');
           return;
         }
       }
@@ -125,9 +122,8 @@ class XPService {
         'lastDailyLogin': FieldValue.serverTimestamp(),
       });
       
-      debugPrint('Daily login bonus awarded to $userId');
-    } catch (e) {
-      debugPrint('Error awarding daily login: $e');
+    } catch (e, stackTrace) {
+      AppLogger.firebaseError('awarding daily login', e, stackTrace);
     }
   }
 
@@ -152,8 +148,8 @@ class XPService {
         'nextClassXP': userClass.getXPToNextClass(xp),
         'progress': userClass.getProgressPercentage(xp),
       };
-    } catch (e) {
-      debugPrint('Error getting user XP info: $e');
+    } catch (e, stackTrace) {
+      AppLogger.firebaseError('getting user XP info', e, stackTrace);
       return {
         'xp': 0,
         'class': UserClass.allClasses.first,
@@ -192,8 +188,8 @@ class XPService {
           'class': userClass,
         };
       }).toList();
-    } catch (e) {
-      debugPrint('Error fetching leaderboard: $e');
+    } catch (e, stackTrace) {
+      AppLogger.firebaseError('fetching leaderboard', e, stackTrace);
       return [];
     }
   }
@@ -223,10 +219,12 @@ class XPService {
         'lastXPUpdate': FieldValue.serverTimestamp(),
       });
       
-      debugPrint('👑 Developer Privilege: MAX XP awarded to $userId! SSS Class unlocked! 🏆');
-    } catch (e) {
-      debugPrint('Error awarding developer max XP: $e');
-      // Silently fail - this is a bonus feature
+      AppLogger.debug('Developer Privilege: MAX XP awarded to $userId! SSS Class unlocked!');
+    } catch (e, stackTrace) {
+      AppLogger.firebaseError('awarding developer max XP', e, stackTrace);
+      // Log warning instead of silently failing
+      // This is a bonus feature, but we should track failures
+      AppLogger.warning('Failed to award developer max XP to $userId', e, stackTrace);
     }
   }
 }

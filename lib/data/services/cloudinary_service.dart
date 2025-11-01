@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import '../../core/logger.dart';
 
 class CloudinaryService {
   static const String _cloudName = 'dkcz4v94a';
-  static const String _apiKey = '153279666527326';
-  static const String _apiSecret = 'GzTXBVob3gEjdC8KcjLVOFaItNA';
+  // Note: _apiKey and _apiSecret are reserved for future signed uploads
+  // Currently using unsigned preset, so these are not used
   static const String _uploadPreset = 'android_unsigned';
   
   static const String _baseUrl = 'https://api.cloudinary.com/v1_1/$_cloudName';
@@ -28,24 +29,18 @@ class CloudinaryService {
         ),
       );
 
-      print('Uploading to Cloudinary with preset: $_uploadPreset'); // Debug log
-      
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
-
-      print('Cloudinary response status: ${response.statusCode}'); // Debug log
-      print('Cloudinary response body: ${response.body}'); // Debug log
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         final secureUrl = responseData['secure_url'] as String;
-        print('Upload successful, URL: $secureUrl'); // Debug log
         return secureUrl;
       } else {
         throw Exception('Failed to upload image: ${response.statusCode} - ${response.body}');
       }
-    } catch (e) {
-      print('Cloudinary upload error: $e'); // Debug log
+    } catch (e, stackTrace) {
+      AppLogger.error('Cloudinary upload error', e, stackTrace);
       throw Exception('Error uploading to Cloudinary: $e');
     }
   }
@@ -55,10 +50,10 @@ class CloudinaryService {
     try {
       // Note: This requires signed requests which need crypto library
       // For now, we'll just return false as unsigned preset doesn't support deletion
-      print('Image deletion not supported with unsigned preset');
+      AppLogger.info('Image deletion not supported with unsigned preset');
       return false;
     } catch (e) {
-      print('Error deleting image: $e');
+      AppLogger.warning('Error deleting image', e);
       return false;
     }
   }
@@ -77,7 +72,7 @@ class CloudinaryService {
       }
       return null;
     } catch (e) {
-      print('Error extracting public ID: $e');
+      AppLogger.warning('Error extracting public ID', e);
       return null;
     }
   }

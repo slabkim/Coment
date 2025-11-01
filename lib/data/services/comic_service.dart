@@ -1,7 +1,6 @@
-import 'package:flutter/foundation.dart';
-
 import '../models/comic_item.dart';
 import '../../core/content_filter.dart';
+import '../../core/logger.dart';
 import 'simple_anilist_service.dart';
 
 /// Service that uses AniList API for comic data
@@ -52,8 +51,9 @@ class ComicService {
           .where((manga) => _isContentSafe(manga))
           .map((manga) => ComicItem.fromManga(manga))
           .toList();
-    } catch (e) {
-      throw Exception('Failed to fetch popular comics: $e');
+    } catch (e, stackTrace) {
+      AppLogger.apiError('fetching popular comics', e, stackTrace);
+      rethrow;
     }
   }
 
@@ -69,8 +69,9 @@ class ComicService {
           .where((manga) => _isContentSafe(manga))
           .map((manga) => ComicItem.fromManga(manga))
           .toList();
-    } catch (e) {
-      throw Exception('Failed to fetch trending comics: $e');
+    } catch (e, stackTrace) {
+      AppLogger.apiError('fetching trending comics', e, stackTrace);
+      rethrow;
     }
   }
 
@@ -86,8 +87,9 @@ class ComicService {
           .where((manga) => _isContentSafe(manga))
           .map((manga) => ComicItem.fromManga(manga))
           .toList();
-    } catch (e) {
-      throw Exception('Failed to fetch top rated comics: $e');
+    } catch (e, stackTrace) {
+      AppLogger.apiError('fetching top rated comics', e, stackTrace);
+      rethrow;
     }
   }
 
@@ -100,8 +102,9 @@ class ComicService {
           .where((manga) => _isContentSafe(manga))
           .map((manga) => ComicItem.fromManga(manga))
           .toList();
-    } catch (e) {
-      throw Exception('Failed to fetch seasonal comics: $e');
+    } catch (e, stackTrace) {
+      AppLogger.apiError('fetching seasonal comics', e, stackTrace);
+      rethrow;
     }
   }
 
@@ -117,8 +120,9 @@ class ComicService {
           .where((manga) => _isContentSafe(manga))
           .map((manga) => ComicItem.fromManga(manga))
           .toList();
-    } catch (e) {
-      throw Exception('Failed to fetch new release comics: $e');
+    } catch (e, stackTrace) {
+      AppLogger.apiError('fetching new release comics', e, stackTrace);
+      rethrow;
     }
   }
 
@@ -135,8 +139,9 @@ class ComicService {
           .where((manga) => _isContentSafe(manga))
           .map((manga) => ComicItem.fromManga(manga))
           .toList();
-    } catch (e) {
-      throw Exception('Failed to search comics: $e');
+    } catch (e, stackTrace) {
+      AppLogger.apiError('searching comics', e, stackTrace);
+      rethrow;
     }
   }
 
@@ -153,8 +158,9 @@ class ComicService {
           .where((manga) => _isContentSafe(manga))
           .map((manga) => ComicItem.fromManga(manga))
           .toList();
-    } catch (e) {
-      throw Exception('Failed to fetch comics by genre: $e');
+    } catch (e, stackTrace) {
+      AppLogger.apiError('fetching comics by genre', e, stackTrace);
+      rethrow;
     }
   }
 
@@ -172,8 +178,9 @@ class ComicService {
       final comicItem = ComicItem.fromManga(anilistManga);
 
       return comicItem;
-    } catch (e) {
-      throw Exception('Failed to fetch comic detail: $e');
+    } catch (e, stackTrace) {
+      AppLogger.apiError('fetching comic detail', e, stackTrace);
+      rethrow;
     }
   }
 
@@ -191,8 +198,9 @@ class ComicService {
       final comicItem = ComicItem.fromManga(anilistManga);
 
       return comicItem;
-    } catch (e) {
-      throw Exception('Failed to fetch comic detail: $e');
+    } catch (e, stackTrace) {
+      AppLogger.apiError('fetching comic detail (full)', e, stackTrace);
+      rethrow;
     }
   }
 
@@ -231,7 +239,7 @@ class ComicService {
       };
     } catch (e) {
       // Fallback to minimal data
-      debugPrint('AniList API failed, using minimal fallback: $e');
+      AppLogger.apiError('AniList API (using minimal fallback)', e);
       return _getMinimalFallback();
     }
   }
@@ -301,8 +309,9 @@ class ComicService {
       }
       
       return allComics.values.toList();
-    } catch (e) {
-      throw Exception('Failed to fetch all comics: $e');
+    } catch (e, stackTrace) {
+      AppLogger.apiError('fetching all comics', e, stackTrace);
+      rethrow;
     }
   }
 
@@ -331,8 +340,9 @@ class ComicService {
       }
 
       return [];
-    } catch (e) {
-      throw Exception('Failed to fetch recommended comics: $e');
+    } catch (e, stackTrace) {
+      AppLogger.apiError('fetching recommended comics', e, stackTrace);
+      rethrow;
     }
   }
 }

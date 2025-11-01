@@ -19,11 +19,6 @@ class ComicDetailHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundUrl = (item.bannerImage != null && item.bannerImage!.isNotEmpty) 
-        ? item.bannerImage! 
-        : item.coverImage ?? item.imageUrl;
-    final frameUrl = item.coverImage ?? item.imageUrl;
-    
     return Container(
       height: 280, // Reduced height for better proportions
       decoration: BoxDecoration(
@@ -159,9 +154,9 @@ class ComicDetailHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 
-                if (item.description != null && item.description!.isNotEmpty)
+                if (item.description.isNotEmpty)
                   Text(
-                    item.description!,
+                    item.description,
                     style: TextStyle(
                       color: AppColors.whiteSecondary,
                       fontSize: 14,

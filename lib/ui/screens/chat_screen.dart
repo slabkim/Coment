@@ -1,19 +1,23 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
-import '../../core/constants.dart';
 import '../../core/auth_helper.dart';
+import '../../core/logger.dart';
 import '../../data/models/chat_message.dart';
 import '../../data/models/user_profile.dart';
 import '../../data/services/chat_history_service.dart';
 import '../../data/services/chat_service.dart';
 import '../../data/services/giphy_service.dart';
 import '../../data/services/user_service.dart';
+import '../widgets/chat/chat_helpers.dart';
+import '../widgets/chat/chat_message_input.dart';
+import '../widgets/chat/chat_message_tile.dart';
+import '../widgets/chat/login_required_widget.dart';
 import '../widgets/class_badge.dart';
-import 'chat_list_screen.dart';
 import 'user_public_profile_screen.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -41,10 +45,9 @@ class _ChatScreenState extends State<ChatScreen> {
   final _userService = UserService();
   final _imagePicker = ImagePicker();
   String? _selfName;
-  int _lastPeerMsgMs = 0;
   File? _selectedImage;
   String? _selectedGifUrl;
-  bool _isSending = false;
+  bool _isUploadingImage = false; // Only for image upload, not for text/GIF messages
 
   @override
   void dispose() {
@@ -79,7 +82,7 @@ class _ChatScreenState extends State<ChatScreen> {
             final photo = profile?.photoUrl ?? widget.peerPhotoUrl;
             // Use joinedAt as fallback if lastSeen not available
             final lastSeen = profile?.lastSeen ?? profile?.joinedAt;
-            final onlineStatus = _getOnlineStatus(lastSeen);
+            final onlineStatus = ChatHelpers.getOnlineStatus(lastSeen);
             
             return GestureDetector(
               onTap: () => _navigateToProfile(widget.peerUserId),
@@ -96,7 +99,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         : null,
                     child: (photo == null || photo.isEmpty)
                         ? Text(
-                            _initials(name),
+                            ChatHelpers.initials(name),
                             style: TextStyle(
                               color: Theme.of(
                                 context,
@@ -157,7 +160,7 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           Expanded(
             child: uid == null
-                ? _LoginRequiredWidget()
+                ? const LoginRequiredWidget()
                 : FutureBuilder<String>(
                     future: _initChat(uid),
                     builder: (context, snap) {
@@ -168,10 +171,98 @@ class _ChatScreenState extends State<ChatScreen> {
                       return StreamBuilder<int?>(
                         stream: _history.watchLastRead(cid, widget.peerUserId),
                         builder: (context, readSnap) {
-                          final peerLastRead = readSnap.data ?? 0;
+                          // Handle error in watchLastRead stream - just use 0 as default
+                          final peerLastRead = readSnap.hasError ? 0 : (readSnap.data ?? 0);
                           return StreamBuilder<List<ChatMessage>>(
                             stream: _chat.watchMessages(cid),
                             builder: (context, s2) {
+                              // Handle error state
+                              if (s2.hasError) {
+                                final error = s2.error;
+                                
+                                // Log error for debugging
+                                if (error != null) {
+                                  AppLogger.firebaseError('Loading chat messages', error, StackTrace.current);
+                                }
+                                
+                                // Show generic error message
+                                return Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(24.0),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.error_outline,
+                                          size: 64,
+                                          color: Theme.of(context).colorScheme.error,
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'Error Loading Messages',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Theme.of(context).colorScheme.onSurface,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Unable to load messages. Please try again.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+                              
+                              // Handle loading state
+                              if (s2.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator());
+                              }
+                              
+                              // Handle empty state
+                              if (!s2.hasData) {
+                                return Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(24.0),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.chat_bubble_outline,
+                                          size: 64,
+                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'No Messages',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Theme.of(context).colorScheme.onSurface,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Start a conversation by sending a message.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+                              
                               final msgs = s2.data ?? const [];
                               // mark read when list updates and show snackbar for new messages
                               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -190,102 +281,14 @@ class _ChatScreenState extends State<ChatScreen> {
                                 itemBuilder: (context, i) {
                                   final m = msgs[i];
                                   final isMe = m.senderId == uid;
-                                  final content =
-                                      m.imageUrl != null &&
-                                          m.imageUrl!.isNotEmpty
-                                      ? Image.network(m.imageUrl!, width: 180)
-                                      : Text(
-                                          m.text ?? '',
-                                          softWrap: true,
-                                          overflow: TextOverflow.clip,
-                                          // Allow wrapping onto multiple lines.
-                                          maxLines: null,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                          ),
-                                        );
                                   final isRead =
                                       isMe &&
                                       (m.createdAt.millisecondsSinceEpoch <=
                                           peerLastRead);
-                                  return Align(
-                                    alignment: isMe
-                                        ? Alignment.centerRight
-                                        : Alignment.centerLeft,
-                                    child: Column(
-                                      crossAxisAlignment: isMe
-                                          ? CrossAxisAlignment.end
-                                          : CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.end,
-                                          children: [
-                                            if (!isMe)
-                                              const SizedBox(width: 0)
-                                            else
-                                              const SizedBox(width: 0),
-                                            // Constrain the bubble max width
-                                            Flexible(
-                                              child: ConstrainedBox(
-                                                constraints: BoxConstraints(
-                                                  maxWidth: MediaQuery.of(context).size.width * 0.72,
-                                                ),
-                                                child: Container(
-                                                  margin: const EdgeInsets.symmetric(
-                                                    vertical: 2,
-                                                  ),
-                                                  padding: const EdgeInsets.symmetric(
-                                                    vertical: 8,
-                                                    horizontal: 12,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Theme.of(context).brightness == Brightness.light
-                                                        ? Colors.black87 // Black for both in light mode
-                                                        : Colors.grey[800], // Grey for both in dark mode
-                                                    borderRadius: BorderRadius.circular(
-                                                      12,
-                                                    ),
-                                                  ),
-                                                  child: content,
-                                                ),
-                                              ),
-                                            ),
-                                            if (isMe) ...[
-                                              const SizedBox(width: 6),
-                                              Icon(
-                                                isRead
-                                                    ? Icons.done_all
-                                                    : Icons.check,
-                                                size: 16,
-                                                color: isRead
-                                                    ? const Color(0xFF4FC3F7)  // Bright blue for read
-                                                    : Colors.grey.shade400,    // Grey for sent
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                        // Timestamp below message bubble
-                                        Padding(
-                                          padding: EdgeInsets.only(
-                                            left: isMe ? 0 : 12,
-                                            right: isMe ? 12 : 0,
-                                            top: 2,
-                                            bottom: 4,
-                                          ),
-                                          child: Text(
-                                            _formatMessageTime(m.createdAt),
-                                            style: TextStyle(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurfaceVariant,
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                  return ChatMessageTile(
+                                    message: m,
+                                    isMe: isMe,
+                                    isRead: isRead,
                                   );
                                 },
                               );
@@ -297,8 +300,24 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
           ),
           
-          // Message input (same design as forum chat)
-          _buildMessageInput(),
+          // Message input
+          ChatMessageInput(
+            messageController: _messageC,
+            onSendMessage: _send,
+            onPickImage: _pickImage,
+            onPickGif: (url) {
+              setState(() {
+                _selectedGifUrl = url;
+                _selectedImage = null; // Clear image if GIF is selected
+              });
+            },
+            selectedImage: _selectedImage,
+            onClearImage: () => setState(() => _selectedImage = null),
+            selectedGifUrl: _selectedGifUrl,
+            onClearGif: () => setState(() => _selectedGifUrl = null),
+            isUploadingImage: _isUploadingImage,
+            giphyService: _giphy,
+          ),
         ],
       ),
     );
@@ -319,7 +338,8 @@ class _ChatScreenState extends State<ChatScreen> {
           _selectedGifUrl = null; // Clear GIF if image is selected
         });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppLogger.error('picking image', e, stackTrace);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error picking image: $e')),
@@ -342,8 +362,8 @@ class _ChatScreenState extends State<ChatScreen> {
       final downloadUrl = await storageRef.getDownloadURL();
       
       return downloadUrl;
-    } catch (e) {
-      debugPrint('Error uploading chat image: $e');
+    } catch (e, stackTrace) {
+      AppLogger.firebaseError('uploading chat image', e, stackTrace);
       return null;
     }
   }
@@ -352,106 +372,144 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _messageC.text.trim();
     if (text.isEmpty && _selectedImage == null && _selectedGifUrl == null) return;
 
-    // Prevent spam clicking
-    if (_isSending) return;
+    // Prevent spam clicking only for image upload
+    if (_isUploadingImage) return;
 
-    // Cek autentikasi dulu
-    final success = await AuthHelper.requireAuthWithDialog(
-      context,
-      'send a message',
-    );
-    if (!success) return;
-
+    // Quick check: if already logged in, skip dialog
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null || _chatId == null) return;
+    if (uid == null) {
+      // Only show dialog if not logged in
+      final success = await AuthHelper.requireAuthWithDialog(
+        context,
+        'send a message',
+      );
+      if (!success) return;
+      // Re-check uid after potential login
+      final newUid = FirebaseAuth.instance.currentUser?.uid;
+      if (newUid == null || _chatId == null) return;
+    }
     
-    setState(() => _isSending = true);
+    if (_chatId == null) return;
     
-    try {
-      final senderName =
-          _selfName ??
-          FirebaseAuth.instance.currentUser?.displayName ??
-          FirebaseAuth.instance.currentUser?.email?.split('@').first;
-      
-      // Handle image upload
-      if (_selectedImage != null) {
+    // Get final uid (guaranteed to be non-null at this point)
+    final finalUid = FirebaseAuth.instance.currentUser?.uid ?? uid;
+    if (finalUid == null) return; // Safety check
+    
+    // Handle image upload first (this takes time, so show loading ONLY for image upload)
+    String? imageUrl;
+    final isImageUpload = _selectedImage != null;
+    final isGifUpload = _selectedGifUrl != null;
+    
+    // Clear text input immediately (for all message types)
+    final messageText = text;
+    _messageC.clear();
+    
+    final senderName =
+        _selfName ??
+        FirebaseAuth.instance.currentUser?.displayName ??
+        FirebaseAuth.instance.currentUser?.email?.split('@').first;
+    
+    // Handle image upload with loading indicator
+    if (isImageUpload) {
+      setState(() => _isUploadingImage = true);
+      try {
         final tempId = DateTime.now().millisecondsSinceEpoch.toString();
-        final imageUrl = await _uploadMessageImage(tempId);
+        imageUrl = await _uploadMessageImage(tempId);
+        if (imageUrl == null) {
+          // Upload failed
+          if (mounted) {
+            setState(() => _isUploadingImage = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Error uploading image')),
+            );
+          }
+          return;
+        }
         
-        if (imageUrl != null) {
+        // Send message after upload
+        try {
           await _chat.sendImage(
             chatId: _chatId!,
-            senderId: uid,
+            senderId: finalUid,
             imageUrl: imageUrl,
             senderName: senderName,
           );
+          // Clear preview and loading after message sent successfully
+          if (mounted) {
+            setState(() {
+              _selectedImage = null;
+              _isUploadingImage = false;
+            });
+          }
+        } catch (e) {
+          // Send failed
+          if (mounted) {
+            setState(() => _isUploadingImage = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error sending message: $e')),
+            );
+          }
+          return;
         }
-      } else if (_selectedGifUrl != null) {
-        // Send GIF
+      } catch (e, stackTrace) {
+        AppLogger.error('uploading image', e, stackTrace);
+        if (mounted) {
+          setState(() => _isUploadingImage = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error uploading image: $e')),
+          );
+        }
+        return;
+      }
+    } else if (isGifUpload) {
+      // For GIF: send immediately (no upload needed), then clear preview
+      final gifUrl = _selectedGifUrl;
+      try {
         await _chat.sendImage(
           chatId: _chatId!,
-          senderId: uid,
-          imageUrl: _selectedGifUrl!,
+          senderId: finalUid,
+          imageUrl: gifUrl!,
           senderName: senderName,
         );
-      } else if (text.isNotEmpty) {
-        // Send text
+        // Clear preview after message sent successfully
+        if (mounted) {
+          setState(() => _selectedGifUrl = null);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error sending message: $e')),
+          );
+        }
+        return;
+      }
+    } else if (messageText.isNotEmpty) {
+      // For text: send immediately (no loading indicator)
+      try {
         await _chat.sendText(
           chatId: _chatId!,
-          senderId: uid,
-          text: text,
+          senderId: finalUid,
+          text: messageText,
           senderName: senderName,
         );
-      }
-      
-      _messageC.clear();
-      if (mounted) {
-        setState(() {
-          _selectedImage = null;
-          _selectedGifUrl = null;
-          _isSending = false;
-        });
-      }
-      
-      _scrollC.animateTo(
-        0,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isSending = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sending message: $e')),
-        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error sending message: $e')),
+          );
+        }
+        return;
       }
     }
-  }
-
-  Future<void> _pickGif() async {
-    // Cek autentikasi dulu
-    final success = await AuthHelper.requireAuthWithDialog(
-      context,
-      'send a GIF',
-    );
-    if (!success) return;
-
-    final url = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: const Color(0xFF0E0F12),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(16)),
-      ),
-      builder: (_) => _GifPicker(giphy: _giphy),
-    );
     
-    if (url != null && url.isNotEmpty) {
-      setState(() {
-        _selectedGifUrl = url;
-        _selectedImage = null; // Clear image if GIF is selected
-      });
-    }
+    // Scroll to bottom immediately (message will appear via StreamBuilder)
+    _scrollC.animateTo(
+      0,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
   }
+
 
   Future<String> _initChat(String uid) async {
     if (_chatId != null) return _chatId!;
@@ -476,462 +534,6 @@ class _ChatScreenState extends State<ChatScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => UserPublicProfileScreen(userId: userId),
-      ),
-    );
-  }
-
-  Widget _buildMessageInput() {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Image preview
-          if (_selectedImage != null)
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              height: 120,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.purpleAccent),
-              ),
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      _selectedImage!,
-                      width: double.infinity,
-                      height: 120,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: IconButton(
-                      icon: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Icon(Icons.close, size: 16, color: Colors.white),
-                      ),
-                      onPressed: () => setState(() => _selectedImage = null),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          
-          // GIF preview
-          if (_selectedGifUrl != null)
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              height: 120,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.purpleAccent),
-              ),
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      _selectedGifUrl!,
-                      width: double.infinity,
-                      height: 120,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        width: double.infinity,
-                        height: 120,
-                        color: Theme.of(context).colorScheme.surfaceVariant,
-                        child: const Icon(Icons.error, size: 32),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: IconButton(
-                      icon: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Icon(Icons.close, size: 16, color: Colors.white),
-                      ),
-                      onPressed: () => setState(() => _selectedGifUrl = null),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          
-          // Input row
-          Row(
-            children: [
-              IconButton(
-                onPressed: _pickImage,
-                icon: Icon(
-                  Icons.image,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-                tooltip: 'Add Image',
-              ),
-              IconButton(
-                onPressed: _pickGif,
-                icon: Icon(
-                  Icons.gif_box,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-                tooltip: 'Add GIF',
-              ),
-              Expanded(
-                child: TextField(
-                  controller: _messageC,
-                  decoration: InputDecoration(
-                    hintText: 'Type a message...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  ),
-                  maxLines: null,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _send(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: _isSending ? null : _send,
-                icon: _isSending
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                          ),
-                        ),
-                      )
-                    : Icon(
-                        Icons.send,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-String _formatMessageTime(DateTime time) {
-  final now = DateTime.now();
-  final diff = now.difference(time);
-  
-  // If message is from today, show time only
-  if (diff.inDays == 0 && now.day == time.day) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
-  }
-  
-  // If message is from yesterday
-  if (diff.inDays == 1 || (diff.inHours >= 24 && now.day - time.day == 1)) {
-    return 'Yesterday';
-  }
-  
-  // If message is within this week, show day name
-  if (diff.inDays < 7) {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return days[time.weekday - 1];
-  }
-  
-  // Otherwise show date
-  final day = time.day.toString().padLeft(2, '0');
-  final month = time.month.toString().padLeft(2, '0');
-  final year = time.year.toString().substring(2);
-  return '$day/$month/$year';
-}
-
-String _initials(String name) {
-  final parts = name.trim().split(' ');
-  final first = parts.isNotEmpty && parts.first.isNotEmpty
-      ? parts.first[0]
-      : 'U';
-  final second = parts.length > 1 && parts.last.isNotEmpty ? parts.last[0] : '';
-  return (first + second).toUpperCase();
-}
-
-String _getOnlineStatus(DateTime? lastSeen) {
-  if (lastSeen == null) {
-    return 'Status tidak tersedia';
-  }
-  
-  final now = DateTime.now();
-  final diff = now.difference(lastSeen);
-  
-  // If last seen within 3 minutes, consider online
-  if (diff.inMinutes < 3) {
-    return 'Online';
-  }
-  
-  // If less than 1 hour
-  if (diff.inMinutes < 60) {
-    final mins = diff.inMinutes;
-    return 'Terakhir online $mins menit yang lalu';
-  }
-  
-  // If less than 24 hours
-  if (diff.inHours < 24) {
-    final hours = diff.inHours;
-    return 'Terakhir online $hours jam yang lalu';
-  }
-  
-  // If less than 7 days
-  if (diff.inDays < 7) {
-    final days = diff.inDays;
-    return 'Terakhir online $days hari yang lalu';
-  }
-  
-  // Otherwise show date
-  final day = lastSeen.day.toString().padLeft(2, '0');
-  final month = lastSeen.month.toString().padLeft(2, '0');
-  final year = lastSeen.year;
-  return 'Terakhir online $day/$month/$year';
-}
-
-class _GifPicker extends StatefulWidget {
-  final GiphyService giphy;
-  const _GifPicker({required this.giphy});
-
-  @override
-  State<_GifPicker> createState() => _GifPickerState();
-}
-
-class _GifPickerState extends State<_GifPicker> {
-  final _q = TextEditingController(text: 'anime');
-  List<String> _results = const [];
-  bool _loading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Cek autentikasi dulu sebelum search
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final success = await AuthHelper.requireAuthWithDialog(
-        context,
-        'search for GIFs',
-      );
-      if (success) {
-        _search();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _q.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _q,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Search GIFs',
-                      hintStyle: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      filled: true,
-                      fillColor: const Color(0xFF121316),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    onSubmitted: (_) async {
-                      // Cek autentikasi dulu
-                      final success = await AuthHelper.requireAuthWithDialog(
-                        context,
-                        'search for GIFs',
-                      );
-                      if (success) {
-                        _search();
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: _loading
-                      ? null
-                      : () async {
-                          // Cek autentikasi dulu
-                          final success =
-                              await AuthHelper.requireAuthWithDialog(
-                                context,
-                                'search for GIFs',
-                              );
-                          if (success) {
-                            _search();
-                          }
-                        },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.purpleAccent,
-                  ),
-                  child: _loading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.search),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 300,
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : GridView.builder(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            mainAxisSpacing: 6,
-                            crossAxisSpacing: 6,
-                          ),
-                      itemCount: _results.length,
-                      itemBuilder: (context, i) => GestureDetector(
-                        onTap: () async {
-                          // Cek autentikasi dulu
-                          final success =
-                              await AuthHelper.requireAuthWithDialog(
-                                context,
-                                'send this GIF',
-                              );
-                          if (success) {
-                            Navigator.pop(context, _results[i]);
-                          }
-                        },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(_results[i], fit: BoxFit.cover),
-                        ),
-                      ),
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _search() async {
-    // Cek autentikasi dulu
-    final success = await AuthHelper.requireAuthWithDialog(
-      context,
-      'search for GIFs',
-    );
-    if (!success) return;
-
-    setState(() => _loading = true);
-    try {
-      final res = await widget.giphy.searchGifs(
-        query: _q.text.trim().isEmpty ? 'anime' : _q.text.trim(),
-      );
-      setState(() => _results = res);
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-}
-
-class _LoginRequiredWidget extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.chat_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Login Required',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Please login to send and receive messages',
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontSize: 16),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () async {
-                final success = await AuthHelper.requireAuth(context);
-                if (success && context.mounted) {
-                  // Refresh the screen to show chat
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => const ChatListScreen()),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.purpleAccent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text('Login Now'),
-            ),
-          ],
-        ),
       ),
     );
   }

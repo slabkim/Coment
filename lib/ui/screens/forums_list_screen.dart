@@ -192,15 +192,17 @@ class _ForumsListScreenState extends State<ForumsListScreen> with SingleTickerPr
             final userId = FirebaseAuth.instance.currentUser?.uid;
             if (userId == null) return;
             
+            // Capture context from State before async operation
+            final stateContext = context;
+            
             try {
               await _memberService.leaveForum(forum.id, userId);
               // Streams auto-update!
             } catch (e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: $e')),
-                );
-              }
+              if (!mounted || !stateContext.mounted) return;
+              ScaffoldMessenger.of(stateContext).showSnackBar(
+                SnackBar(content: Text('Error: $e')),
+              );
             }
           },
         );
@@ -256,6 +258,9 @@ class _ForumsListScreenState extends State<ForumsListScreen> with SingleTickerPr
             final userId = FirebaseAuth.instance.currentUser?.uid;
             if (userId == null) return;
             
+            // Capture context from State before async operation
+            final stateContext = context;
+            
             try {
               if (isJoined) {
                 await _memberService.leaveForum(forum.id, userId);
@@ -264,11 +269,10 @@ class _ForumsListScreenState extends State<ForumsListScreen> with SingleTickerPr
               }
               // Streams auto-update!
             } catch (e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: $e')),
-                );
-              }
+              if (!mounted || !stateContext.mounted) return;
+              ScaffoldMessenger.of(stateContext).showSnackBar(
+                SnackBar(content: Text('Error: $e')),
+              );
             }
           },
         );

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../core/constants.dart';
 import '../../core/auth_helper.dart';
 import '../../data/services/anime_news_service.dart';
 import '../../data/models/news_article.dart';
@@ -128,11 +127,12 @@ class _NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
       context, 
       'read this news article'
     );
-    if (!success) return;
+    if (!success || !mounted) return;
     
     try {
       // Validate URL format
       if (article.url.isEmpty || !article.url.startsWith('http')) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Invalid URL: ${article.url}'),
@@ -168,6 +168,7 @@ class _NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
               mode: LaunchMode.externalApplication,
             );
           } catch (e2) {
+            if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Could not open: ${article.url}'),
@@ -178,6 +179,7 @@ class _NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
           }
         }
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Cannot open: ${article.url}'),
@@ -187,6 +189,7 @@ class _NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error opening article: $e'),

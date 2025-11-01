@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import '../../core/logger.dart';
 import '../models/user_profile.dart';
-
 import 'package:rxdart/rxdart.dart' as rx;
 
 class UserService {
@@ -38,8 +37,10 @@ class UserService {
       await _db.collection('users').doc(uid).set({
         'lastSeen': timestamp,
       }, SetOptions(merge: true));
-    } catch (e) {
-      // Silently fail
+    } catch (e, stackTrace) {
+      // Log warning instead of silently failing
+      // This is a non-critical operation, but we should track failures
+      AppLogger.warning('Failed to update lastSeen for user: $uid', e, stackTrace);
     }
   }
 

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'logger.dart';
 
 /// Centralized error handling for API calls
 class ApiErrorHandler {
@@ -31,10 +31,6 @@ class ApiErrorHandler {
         return 'AniList service is temporarily unavailable.';
       }
       
-      if (message.contains('MangaDex') && message.contains('Error')) {
-        return 'MangaDx service is temporarily unavailable.';
-      }
-      
       // Generic API errors
       if (message.contains('Failed to fetch') || message.contains('Failed to search')) {
         return 'Unable to load data. Please try again.';
@@ -50,16 +46,9 @@ class ApiErrorHandler {
     return 'Something went wrong. Please try again.';
   }
   
+  /// Log API errors using the centralized logger
   static void logError(dynamic error, [StackTrace? stackTrace]) {
-    if (kDebugMode) {
-      debugPrint('API Error: $error');
-      if (stackTrace != null) {
-        debugPrint('Stack trace: $stackTrace');
-      }
-    }
-    
-    // In production, you might want to send this to a crash reporting service
-    // like Firebase Crashlytics or Sentry
+    AppLogger.apiError('API call', error, stackTrace);
   }
 }
 
@@ -106,10 +95,13 @@ class ApiResult<T> {
   /// Transform the data if successful
   ApiResult<U> map<U>(U Function(T data) transform) {
     if (isSuccess) {
-      try {
-        return ApiResult.success(transform(data!));
-      } catch (e) {
-        return ApiResult.error(ApiErrorHandler.getErrorMessage(e));
+      final dataValue = data;
+      if (dataValue != null) {
+        try {
+          return ApiResult.success(transform(dataValue));
+        } catch (e) {
+          return ApiResult.error(ApiErrorHandler.getErrorMessage(e));
+        }
       }
     }
     

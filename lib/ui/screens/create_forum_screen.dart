@@ -4,9 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../../core/constants.dart';
+import '../../core/logger.dart';
 import '../../data/services/forum_service.dart';
 import '../../data/services/user_service.dart';
-import '../../data/services/forum_member_service.dart';
 import 'forum_chat_screen.dart';
 
 class CreateForumScreen extends StatefulWidget {
@@ -21,13 +21,11 @@ class _CreateForumScreenState extends State<CreateForumScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _forumService = ForumService();
-  final _memberService = ForumMemberService();
   final _userService = UserService();
   final _imagePicker = ImagePicker();
   
   bool _isCreating = false;
   File? _selectedImage;
-  String? _uploadedImageUrl;
 
   @override
   void dispose() {
@@ -72,8 +70,8 @@ class _CreateForumScreenState extends State<CreateForumScreen> {
       final downloadUrl = await storageRef.getDownloadURL();
       
       return downloadUrl;
-    } catch (e) {
-      debugPrint('Error uploading cover image: $e');
+    } catch (e, stackTrace) {
+      AppLogger.firebaseError('uploading cover image', e, stackTrace);
       return null;
     }
   }
@@ -135,7 +133,8 @@ class _CreateForumScreenState extends State<CreateForumScreen> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppLogger.firebaseError('creating forum', e, stackTrace);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import '../../core/constants.dart';
+import '../../core/logger.dart';
 import '../models/forum.dart';
 import '../models/user_profile.dart';
 
@@ -85,11 +85,10 @@ class ForumService {
       
       await batch.commit();
       
-      debugPrint('Forum created: $forumId by $creatorName${isCreatorDeveloper ? " (DEVELOPER - Auto-Moderator)" : ""} | Developer auto-added as moderator');
       
       return forumId;
     } catch (e) {
-      debugPrint('Error creating forum: $e');
+      AppLogger.firebaseError('creating forum', e);
       rethrow;
     }
   }
@@ -103,7 +102,7 @@ class ForumService {
       
       return Forum.fromMap(doc.id, doc.data()!);
     } catch (e) {
-      debugPrint('Error getting forum: $e');
+      AppLogger.firebaseError('getting forum', e);
       return null;
     }
   }
@@ -134,7 +133,7 @@ class ForumService {
           .map((doc) => Forum.fromMap(doc.id, doc.data()))
           .toList();
     } catch (e) {
-      debugPrint('Error getting all forums: $e');
+      AppLogger.firebaseError('getting all forums', e);
       return [];
     }
   }
@@ -175,7 +174,6 @@ class ForumService {
         throw Exception('You do not have permission to delete this forum');
       }
       
-      debugPrint('Deleting forum $forumId and all related data...');
       
       // Delete all related data in batches (max 500 operations per batch)
       await _deleteCollectionInBatches('forum_messages', 'forumId', forumId);
@@ -185,9 +183,8 @@ class ForumService {
       // Finally delete the forum document itself
       await _db.collection('forums').doc(forumId).delete();
       
-      debugPrint('Forum $forumId successfully deleted by $userId');
     } catch (e) {
-      debugPrint('Error deleting forum: $e');
+      AppLogger.firebaseError('deleting forum', e);
       rethrow;
     }
   }
@@ -198,9 +195,8 @@ class ForumService {
       await _db.collection('forums').doc(forumId).update({
         'coverImage': coverImageUrl,
       });
-      debugPrint('Forum $forumId cover image updated: $coverImageUrl');
     } catch (e) {
-      debugPrint('Error updating forum cover: $e');
+      AppLogger.firebaseError('updating forum cover', e);
       rethrow;
     }
   }
@@ -228,7 +224,6 @@ class ForumService {
       }
       
       await batch.commit();
-      debugPrint('Deleted ${snapshot.docs.length} documents from $collectionName');
       
       // If less than batch size, we're done
       if (snapshot.docs.length < batchSize) break;
@@ -253,9 +248,8 @@ class ForumService {
       
       await _db.collection('forums').doc(forumId).update(updates);
       
-      debugPrint('Forum $forumId updated');
     } catch (e) {
-      debugPrint('Error updating forum: $e');
+      AppLogger.firebaseError('updating forum', e);
       rethrow;
     }
   }
@@ -272,9 +266,8 @@ class ForumService {
         'isPinned': true,
       });
       
-      debugPrint('Message $messageId pinned in forum $forumId');
     } catch (e) {
-      debugPrint('Error pinning message: $e');
+      AppLogger.firebaseError('pinning message', e);
       rethrow;
     }
   }
@@ -291,9 +284,8 @@ class ForumService {
         'isPinned': false,
       });
       
-      debugPrint('Message $messageId unpinned in forum $forumId');
     } catch (e) {
-      debugPrint('Error unpinning message: $e');
+      AppLogger.firebaseError('unpinning message', e);
       rethrow;
     }
   }
@@ -305,9 +297,8 @@ class ForumService {
         'moderatorIds': FieldValue.arrayUnion([userId]),
       });
       
-      debugPrint('User $userId added as moderator to forum $forumId');
     } catch (e) {
-      debugPrint('Error adding moderator: $e');
+      AppLogger.firebaseError('adding moderator', e);
       rethrow;
     }
   }
@@ -319,9 +310,8 @@ class ForumService {
         'moderatorIds': FieldValue.arrayRemove([userId]),
       });
       
-      debugPrint('User $userId removed as moderator from forum $forumId');
     } catch (e) {
-      debugPrint('Error removing moderator: $e');
+      AppLogger.firebaseError('removing moderator', e);
       rethrow;
     }
   }
@@ -334,7 +324,7 @@ class ForumService {
       
       return forum.isModerator(userId);
     } catch (e) {
-      debugPrint('Error checking moderator status: $e');
+      AppLogger.firebaseError('checking moderator status', e);
       return false;
     }
   }
@@ -352,7 +342,7 @@ class ForumService {
       
       return forum.canDelete(userId, email: email, handle: handle);
     } catch (e) {
-      debugPrint('Error checking delete permission: $e');
+      AppLogger.firebaseError('checking delete permission', e);
       return false;
     }
   }

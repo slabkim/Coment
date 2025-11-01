@@ -52,6 +52,8 @@ class AuthHelper {
     );
 
     if (shouldLogin == true) {
+      // Check if context is still mounted before using it
+      if (!context.mounted) return false;
       return await requireAuth(context);
     }
 

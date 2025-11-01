@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart';
 import '../models/manga.dart';
 import '../models/external_link.dart';
+import '../../core/logger.dart';
 
 class SimpleAniListService {
   static const String _baseUrl = 'https://graphql.anilist.co';
@@ -377,7 +377,6 @@ class SimpleAniListService {
     final limitedGenres = genres.length > 3 ? genres.sublist(0, 3) : genres;
     
     if (limitedGenres.isEmpty) {
-      debugPrint('No genres provided');
       return [];
     }
     
@@ -386,7 +385,6 @@ class SimpleAniListService {
     if (_genreCache.containsKey(cacheKey) && _genreCacheTime.containsKey(cacheKey)) {
       final cacheAge = DateTime.now().difference(_genreCacheTime[cacheKey]!);
       if (cacheAge < _genreCacheDuration) {
-        debugPrint('Using cached results for ${limitedGenres.join(", ")} (age: ${cacheAge.inMinutes}m)');
         return _genreCache[cacheKey]!;
       } else {
         // Cache expired
@@ -457,7 +455,6 @@ class SimpleAniListService {
         final timeSinceLastRequest = DateTime.now().difference(_lastRequestTime!);
         if (timeSinceLastRequest < _minRequestInterval) {
           final waitTime = _minRequestInterval - timeSinceLastRequest;
-          debugPrint('Rate limiting: waiting ${waitTime.inMilliseconds}ms');
           await Future.delayed(waitTime);
         }
       }
@@ -475,7 +472,7 @@ class SimpleAniListService {
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
         if (jsonData['errors'] != null) {
-          debugPrint('GraphQL Error for ${limitedGenres.join(", ")}: ${jsonData['errors']}');
+          AppLogger.warning('GraphQL Error for ${limitedGenres.join(", ")}: ${jsonData['errors']}');
           return [];
         }
         
@@ -486,16 +483,10 @@ class SimpleAniListService {
         _genreCache[cacheKey] = comics;
         _genreCacheTime[cacheKey] = DateTime.now();
         
-        final genreText = limitedGenres.join(", ");
-        if (genres.length > 3) {
-          debugPrint('Fetched ${comics.length} comics for $genreText (limited from ${genres.length} genres)');
-        } else {
-          debugPrint('Fetched ${comics.length} comics for $genreText');
-        }
         return comics;
       } else if (response.statusCode == 429) {
         // Rate limited - wait and retry once
-        debugPrint('Rate limited for ${limitedGenres.join(", ")}, waiting 5s before retry...');
+        AppLogger.warning('Rate limited for ${limitedGenres.join(", ")}, waiting 5s before retry...');
         await Future.delayed(const Duration(seconds: 5));
         _lastRequestTime = DateTime.now();
         
@@ -519,18 +510,17 @@ class SimpleAniListService {
             _genreCache[cacheKey] = comics;
             _genreCacheTime[cacheKey] = DateTime.now();
             
-            debugPrint('Retry successful: Fetched ${comics.length} comics for ${limitedGenres.join(", ")}');
             return comics;
           }
         }
-        debugPrint('Retry failed for ${limitedGenres.join(", ")}');
+        AppLogger.warning('Retry failed for ${limitedGenres.join(", ")}');
         return [];
       } else {
-        debugPrint('HTTP Error ${response.statusCode} for ${limitedGenres.join(", ")}');
+        AppLogger.warning('HTTP Error ${response.statusCode} for ${limitedGenres.join(", ")}');
         return [];
       }
     } catch (e) {
-      debugPrint('Error fetching comics for ${limitedGenres.join(", ")}: $e');
+      AppLogger.apiError('fetching comics for ${limitedGenres.join(", ")}', e);
       return [];
     }
   }
@@ -578,7 +568,6 @@ class SimpleAniListService {
     // Sort alphabetically for better UX
     commonCategories.sort((a, b) => a.compareTo(b));
     
-    debugPrint('Loaded ${commonCategories.length} common categories');
     return commonCategories;
   }
 
@@ -589,7 +578,7 @@ class SimpleAniListService {
       final timeSinceLastRequest = DateTime.now().difference(_lastRequestTime!);
       if (timeSinceLastRequest < _minRequestInterval) {
         final waitTime = _minRequestInterval - timeSinceLastRequest;
-        debugPrint('Rate limiting: waiting ${waitTime.inMilliseconds}ms');
+        AppLogger.debug('Rate limiting: waiting ${waitTime.inMilliseconds}ms');
         await Future.delayed(waitTime);
       }
     }
@@ -610,7 +599,7 @@ class SimpleAniListService {
         if (response.statusCode == 200) {
           final jsonData = json.decode(response.body);
           if (jsonData['errors'] != null) {
-            debugPrint('GraphQL Error: ${jsonData['errors']}');
+            AppLogger.warning('GraphQL Error: ${jsonData['errors']}');
             if (attempt < 3) {
               await Future.delayed(Duration(seconds: attempt));
               continue;
@@ -623,7 +612,7 @@ class SimpleAniListService {
         } else if (response.statusCode == 429) {
           // Rate limited - use exponential backoff with longer delays
           final waitSeconds = attempt * 4; // 4, 8, 12 seconds
-          debugPrint('Rate limited (429), waiting $waitSeconds seconds');
+          AppLogger.warning('Rate limited (429), waiting $waitSeconds seconds');
           if (attempt < 3) {
             await Future.delayed(Duration(seconds: waitSeconds));
             // Reset last request time to prevent immediate next request
@@ -633,18 +622,18 @@ class SimpleAniListService {
           throw Exception('Rate limited');
         } else if (response.statusCode >= 500) {
           // Server error, retry
-          debugPrint('Server error ${response.statusCode}, retrying...');
+          AppLogger.warning('Server error ${response.statusCode}, retrying...');
           if (attempt < 3) {
             await Future.delayed(Duration(seconds: attempt));
             continue;
           }
           throw Exception('Server error: ${response.statusCode}');
         } else {
-          debugPrint('HTTP Error: ${response.statusCode} - ${response.body}');
+          AppLogger.warning('HTTP Error: ${response.statusCode} - ${response.body}');
           throw Exception('HTTP Error: ${response.statusCode}');
         }
       } catch (e) {
-        debugPrint('Service Error attempt $attempt: $e');
+        AppLogger.warning('Service Error attempt $attempt', e);
         if (attempt < 3) {
           await Future.delayed(Duration(seconds: attempt));
           continue;
@@ -733,7 +722,7 @@ class SimpleAniListService {
       }
       return null;
     } catch (e) {
-      debugPrint('Error fetching manga by ID: $e');
+      AppLogger.apiError('fetching manga by ID', e);
       return null;
     }
   }
@@ -797,22 +786,18 @@ class SimpleAniListService {
     ''';
 
     try {
-      debugPrint('Fetching basic manga details for ID: $id');
       final response = await http.post(
         Uri.parse(_baseUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'query': basicQuery}),
       );
 
-      debugPrint('Response status: ${response.statusCode}');
-      debugPrint('Response body length: ${response.body.length}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        debugPrint('Response data keys: ${data.keys}');
         
         if (data['errors'] != null) {
-          debugPrint('GraphQL errors: ${data['errors']}');
+          AppLogger.warning('GraphQL errors: ${data['errors']}');
           return null;
         }
         
@@ -821,11 +806,11 @@ class SimpleAniListService {
           return Manga.fromJson(media);
         }
       } else {
-        debugPrint('HTTP error: ${response.statusCode} - ${response.body}');
+        AppLogger.warning('HTTP error: ${response.statusCode} - ${response.body}');
       }
       return null;
     } catch (e) {
-      debugPrint('Error fetching full manga by ID: $e');
+      AppLogger.apiError('fetching full manga by ID', e);
       return null;
     }
   }
@@ -856,7 +841,6 @@ class SimpleAniListService {
         final timeSinceLastRequest = DateTime.now().difference(_lastRequestTime!);
         if (timeSinceLastRequest < _minRequestInterval) {
           final waitTime = _minRequestInterval - timeSinceLastRequest;
-          debugPrint('Rate limiting: waiting ${waitTime.inMilliseconds}ms');
           await Future.delayed(waitTime);
         }
       }
@@ -872,7 +856,7 @@ class SimpleAniListService {
         final data = jsonDecode(response.body);
         
         if (data['errors'] != null) {
-          debugPrint('GraphQL errors for external links: ${data['errors']}');
+          AppLogger.warning('GraphQL errors for external links: ${data['errors']}');
           return [];
         }
         
@@ -884,34 +868,26 @@ class SimpleAniListService {
           return externalLinks;
         }
       } else if (response.statusCode == 429) {
-        debugPrint('Rate limited by AniList API (429)');
+        AppLogger.warning('Rate limited by AniList API (429)');
         // Cache empty result to avoid repeated rate limit calls
         _externalLinksCache[id] = [];
         return [];
       }
       
       // Return empty list if no external links found
-      debugPrint('No external links found');
       _externalLinksCache[id] = []; // Cache empty result
       return [];
     } catch (e) {
-      debugPrint('Error fetching external links: $e');
+      AppLogger.apiError('fetching external links', e);
       // Don't cache error responses, return empty list
       return [];
     }
   }
 
-  /// Get fallback external links for testing
-  List<ExternalLink> _getFallbackExternalLinks() {
-    // Return empty list to avoid showing template data
-    // This will make the "Where to Read" tab show "No external links available"
-    return [];
-  }
 
   /// Clear external links cache
   static void clearExternalLinksCache() {
     _externalLinksCache.clear();
-    debugPrint('External links cache cleared');
   }
 
   /// Get external links with retry mechanism
@@ -933,14 +909,14 @@ class SimpleAniListService {
           await Future.delayed(const Duration(seconds: 2));
         }
       } catch (e) {
-        debugPrint('Error fetching external links for manga ID: $id, attempt ${attempt + 1}: $e');
+        AppLogger.warning('Error fetching external links for manga ID: $id, attempt ${attempt + 1}', e);
         if (attempt < maxRetries - 1) {
           await Future.delayed(const Duration(seconds: 2));
         }
       }
     }
     
-    debugPrint('No external links found after $maxRetries attempts for manga ID: $id');
+    AppLogger.warning('No external links found after $maxRetries attempts for manga ID: $id');
     return [];
   }
 
@@ -992,11 +968,11 @@ class SimpleAniListService {
           }
         }
       } else {
-        debugPrint('HTTP error for characters: ${response.statusCode} - ${response.body}');
+        AppLogger.warning('HTTP error for characters: ${response.statusCode} - ${response.body}');
       }
       return [];
     } catch (e) {
-      debugPrint('Error fetching characters: $e');
+      AppLogger.apiError('fetching characters', e);
       return [];
     }
   }
@@ -1053,11 +1029,11 @@ class SimpleAniListService {
           }
         }
       } else {
-        debugPrint('HTTP error for relations: ${response.statusCode} - ${response.body}');
+        AppLogger.warning('HTTP error for relations: ${response.statusCode} - ${response.body}');
       }
       return [];
     } catch (e) {
-      debugPrint('Error fetching relations: $e');
+      AppLogger.apiError('fetching relations', e);
       return [];
     }
   }
@@ -1146,11 +1122,11 @@ class SimpleAniListService {
           }
         }
       } else {
-        debugPrint('HTTP error for recommendations: ${response.statusCode} - ${response.body}');
+        AppLogger.warning('HTTP error for recommendations: ${response.statusCode} - ${response.body}');
       }
       return [];
     } catch (e) {
-      debugPrint('Error fetching recommendations: $e');
+      AppLogger.apiError('fetching recommendations', e);
       return [];
     }
   }
@@ -1250,7 +1226,6 @@ class SimpleAniListService {
     if (_searchCache.containsKey(cacheKey) && _searchCacheTime.containsKey(cacheKey)) {
       final cacheAge = DateTime.now().difference(_searchCacheTime[cacheKey]!);
       if (cacheAge < _searchCacheDuration) {
-        debugPrint('Using cached search results for: $query (age: ${cacheAge.inMinutes}m)');
         return _searchCache[cacheKey]!;
       } else {
         // Cache expired, remove it
@@ -1295,10 +1270,9 @@ class SimpleAniListService {
       // Cache the results with timestamp
       _searchCache[cacheKey] = results;
       _searchCacheTime[cacheKey] = DateTime.now();
-      debugPrint('Cached search results for: $query (${results.length} items)');
       return results;
     } catch (e) {
-      debugPrint('Error searching manga: $e');
+      AppLogger.apiError('searching manga', e);
       return [];
     }
   }
@@ -1309,11 +1283,9 @@ class SimpleAniListService {
     if (_mixedFeedCache.isNotEmpty && _mixedFeedCacheTime != null) {
       final cacheAge = DateTime.now().difference(_mixedFeedCacheTime!);
       if (cacheAge < _mixedFeedCacheDuration) {
-        debugPrint('Using cached mixed feed data (age: ${cacheAge.inMinutes}m)');
         return _mixedFeedCache;
       } else {
         // Cache expired
-        debugPrint('Mixed feed cache expired, refreshing...');
         _mixedFeedCache.clear();
         _mixedFeedCacheTime = null;
       }
@@ -1449,13 +1421,11 @@ class SimpleAniListService {
         final timeSinceLastRequest = DateTime.now().difference(_lastRequestTime!);
         if (timeSinceLastRequest < _minRequestInterval) {
           final waitTime = _minRequestInterval - timeSinceLastRequest;
-          debugPrint('Rate limiting: waiting ${waitTime.inMilliseconds}ms');
           await Future.delayed(waitTime);
         }
       }
       _lastRequestTime = DateTime.now();
 
-      debugPrint('Fetching mixed feed with single query');
       final response = await http.post(
         Uri.parse(_baseUrl),
         headers: {'Content-Type': 'application/json'},
@@ -1466,7 +1436,7 @@ class SimpleAniListService {
         final data = jsonDecode(response.body);
         
         if (data['errors'] != null) {
-          debugPrint('GraphQL errors: ${data['errors']}');
+          AppLogger.warning('GraphQL errors: ${data['errors']}');
           return _getEmptyMixedFeed();
         }
         
@@ -1482,14 +1452,13 @@ class SimpleAniListService {
         // Cache the result with timestamp
         _mixedFeedCache = result;
         _mixedFeedCacheTime = DateTime.now();
-        debugPrint('Mixed feed cached successfully');
         return result;
       } else {
-        debugPrint('HTTP error: ${response.statusCode}');
+        AppLogger.warning('HTTP error: ${response.statusCode}');
         return _getEmptyMixedFeed();
       }
     } catch (e) {
-      debugPrint('Error fetching mixed feed: $e');
+      AppLogger.apiError('fetching mixed feed', e);
       return _getEmptyMixedFeed();
     }
   }
@@ -1515,21 +1484,18 @@ class SimpleAniListService {
   static void clearMixedFeedCache() {
     _mixedFeedCache.clear();
     _mixedFeedCacheTime = null;
-    debugPrint('Mixed feed cache cleared');
   }
 
   /// Clear search cache
   static void clearSearchCache() {
     _searchCache.clear();
     _searchCacheTime.clear();
-    debugPrint('Search cache cleared');
   }
 
   /// Clear genre cache
   static void clearGenreCache() {
     _genreCache.clear();
     _genreCacheTime.clear();
-    debugPrint('Genre cache cleared');
   }
   
   /// Clear all caches
@@ -1541,6 +1507,5 @@ class SimpleAniListService {
     _externalLinksCache.clear();
     _genreCache.clear();
     _genreCacheTime.clear();
-    debugPrint('All caches cleared');
   }
 }

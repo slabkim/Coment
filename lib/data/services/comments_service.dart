@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/logger.dart';
 import 'xp_service.dart';
 
 class CommentModel {
@@ -148,7 +149,9 @@ class CommentsService {
         'createdAt': DateTime.now().millisecondsSinceEpoch,
       });
     } catch (e) {
-      // Silently fail notification
+      // Log warning instead of silently failing
+      // Notification failure shouldn't block comment creation
+      AppLogger.warning('Failed to send comment reply notification', e);
     }
   }
   

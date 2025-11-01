@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
-import '../data/services/shared_prefs_service.dart';
+import '../core/logger.dart';
 import '../core/api_error_handler.dart';
-
+import '../data/services/shared_prefs_service.dart';
 import '../data/models/nandogami_item.dart';
 import '../data/repositories/comic_repository.dart';
 import '../data/adapters/comic_adapter.dart';
@@ -101,14 +101,13 @@ class ItemProvider extends ChangeNotifier {
       // If API returns no results and query is long enough for typos,
       // try local fuzzy search as fallback
       if (_filtered.isEmpty && query.length > 3) {
-        debugPrint('API returned no results for "$query", trying local fuzzy search...');
+        AppLogger.debug('API returned no results for "$query", trying local fuzzy search...');
         _applyFilter(); // This includes fuzzy matching
       }
     } catch (e, stackTrace) {
       ApiErrorHandler.logError(e, stackTrace);
-      // Fallback to local search if API fails
+      // Fallback to local search if API fails (error already logged above)
       _applyFilter();
-      // Don't set error for search failures, just fallback silently
     } finally {
       _loading = false;
       notifyListeners();
@@ -249,7 +248,8 @@ class ItemProvider extends ChangeNotifier {
   NandogamiItem? findById(String id) {
     try {
       return _all.firstWhere((e) => e.id == id);
-    } catch (_) {
+    } catch (e, stackTrace) {
+      AppLogger.debug('Item not found: $id', e, stackTrace);
       return null;
     }
   }
@@ -272,7 +272,9 @@ class ItemProvider extends ChangeNotifier {
         return comic;
       }
     } catch (e) {
-      // Silently fail
+      // Log warning instead of silently failing
+      // Item lookup failure is non-critical
+      AppLogger.warning('Failed to fetch item by ID: $id', e);
     }
     
     return null;

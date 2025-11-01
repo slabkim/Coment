@@ -2,6 +2,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../data/models/nandogami_item.dart';
 
+/// A card widget for displaying manga/comic items.
+/// Supports both horizontal and vertical layouts with favorite functionality.
 class ItemCard extends StatelessWidget {
   final NandogamiItem item;
   final VoidCallback onTap;

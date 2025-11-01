@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../core/constants.dart';
+import '../../core/logger.dart';
 import '../../data/services/user_service.dart';
 import '../../data/services/cloudinary_service.dart';
 
@@ -59,7 +59,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         actions: [
           TextButton(
             onPressed: _saving ? null : () {
-              print('Save button pressed'); // Debug log
+              AppLogger.debug('Save button pressed');
               _save();
             },
             child: _saving

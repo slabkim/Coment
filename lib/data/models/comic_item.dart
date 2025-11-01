@@ -5,7 +5,6 @@ class ComicItem {
   // Core identifiers
   final String id; // AniList ID as string
   final int anilistId;
-  final String? mangadexId;
 
   // Basic info (primarily from AniList)
   final String title;
@@ -29,9 +28,6 @@ class ComicItem {
   final int? favourites;
   final bool isCompleted;
 
-  // MangaDex specific data
-  final String? mangadexCoverUrl;
-
   // UI flags (computed based on data)
   final bool? isFeatured;
   final bool? isNewRelease;
@@ -40,7 +36,6 @@ class ComicItem {
   const ComicItem({
     required this.id,
     required this.anilistId,
-    this.mangadexId,
     required this.title,
     required this.description,
     required this.imageUrl,
@@ -59,7 +54,6 @@ class ComicItem {
     this.popularity,
     this.favourites,
     required this.isCompleted,
-    this.mangadexCoverUrl,
     this.isFeatured,
     this.isNewRelease,
     this.isPopular,
@@ -153,70 +147,6 @@ class ComicItem {
     };
   }
 
-  /// Deprecated: Preview pages are now fetched separately via Comick.app
-  @Deprecated('No longer used - preview pages fetched separately')
-  ComicItem copyWithPreviewPages(List<String> pages) {
-    return ComicItem(
-      id: id,
-      anilistId: anilistId,
-      mangadexId: mangadexId,
-      title: title,
-      description: description,
-      imageUrl: imageUrl,
-      alternativeTitles: alternativeTitles,
-      author: author,
-      categories: categories,
-      chapters: chapters,
-      format: format,
-      rating: rating,
-      ratingCount: ratingCount,
-      releaseYear: releaseYear,
-      synopsis: synopsis,
-      themes: themes,
-      type: type,
-      status: status,
-      popularity: popularity,
-      favourites: favourites,
-      isCompleted: isCompleted,
-      mangadexCoverUrl: mangadexCoverUrl,
-      isFeatured: isFeatured,
-      isNewRelease: isNewRelease,
-      isPopular: isPopular,
-    );
-  }
-
-  /// Deprecated: MangaDex is no longer used
-  @Deprecated('No longer used - MangaDex replaced by Comick.app')
-  ComicItem copyWithMangaDexId(String mdxId) {
-    return ComicItem(
-      id: id,
-      anilistId: anilistId,
-      mangadexId: mdxId,
-      title: title,
-      description: description,
-      imageUrl: imageUrl,
-      alternativeTitles: alternativeTitles,
-      author: author,
-      categories: categories,
-      chapters: chapters,
-      format: format,
-      rating: rating,
-      ratingCount: ratingCount,
-      releaseYear: releaseYear,
-      synopsis: synopsis,
-      themes: themes,
-      type: type,
-      status: status,
-      popularity: popularity,
-      favourites: favourites,
-      isCompleted: isCompleted,
-      mangadexCoverUrl: mangadexCoverUrl,
-      isFeatured: isFeatured,
-      isNewRelease: isNewRelease,
-      isPopular: isPopular,
-    );
-  }
-
   /// Create ComicItem from Jikan API data
   factory ComicItem.fromJikan(dynamic jikanManga) {
     final genres = (jikanManga.genres as List<dynamic>?) ?? [];
@@ -228,7 +158,6 @@ class ComicItem {
     return ComicItem(
       id: 'jikan_${jikanManga.malId}',
       anilistId: jikanManga.malId,
-      mangadexId: null,
       title: jikanManga.title ?? 'Unknown Title',
       description: jikanManga.synopsis ?? 'No description available',
       imageUrl: jikanManga.imageUrl ?? 'https://via.placeholder.com/300x400?text=No+Image',
@@ -247,7 +176,6 @@ class ComicItem {
       popularity: jikanManga.popularity,
       favourites: jikanManga.favorites,
       isCompleted: jikanManga.status == 'Finished',
-      mangadexCoverUrl: null,
       isFeatured: jikanManga.rank != null && jikanManga.rank! <= 10,
       isNewRelease: _isJikanNewRelease(jikanManga),
       isPopular: jikanManga.popularity != null && jikanManga.popularity! <= 100,
@@ -338,6 +266,6 @@ class ComicItem {
 
   @override
   String toString() {
-    return 'ComicItem(id: $id, title: $title, anilistId: $anilistId, mangadexId: $mangadexId)';
+    return 'ComicItem(id: $id, title: $title, anilistId: $anilistId)';
   }
 }
