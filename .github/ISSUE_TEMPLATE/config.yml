@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Vulnerability
+    url: https://github.com/slabkim/Coment/security/advisories/new
+    about: Please report security vulnerabilities privately here
+  - name: Community Support
+    url: https://github.com/slabkim/Coment/discussions
+    about: Ask questions and discuss with the community
+
