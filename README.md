@@ -5,7 +5,7 @@
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Flutter](https://img.shields.io/badge/Flutter-3.9+-02569B.svg?logo=flutter)
 ![Firebase](https://img.shields.io/badge/Firebase-Enabled-FFCA28.svg?logo=firebase)
-![License](https://img.shields.io/badge/license-Private-red.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 **A beautiful Flutter app for discovering and exploring manga with social features**
 
