@@ -1,6 +1,6 @@
 name: nandogami_flutter
 description: Modern manga discovery experience for the Nandogami community.
-publish_to: 'none'
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
@@ -22,6 +22,7 @@ dependencies:
   firebase_analytics: ^11.3.3
   firebase_crashlytics: ^4.1.3
   firebase_app_check: ^0.3.2+10
+  cloud_functions: ^5.0.3
   flutter_local_notifications: ^17.1.2
   share_plus: ^10.0.2
   image_picker: ^1.1.2
@@ -43,6 +44,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - .env
 
 flutter_icons:
   android: true

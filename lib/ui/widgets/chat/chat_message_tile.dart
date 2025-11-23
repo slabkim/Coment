@@ -60,11 +60,11 @@ class ChatMessageTile extends StatelessWidget {
               if (isMe) ...[
                 const SizedBox(width: 6),
                 Icon(
-                  isRead ? Icons.done_all : Icons.check,
+                  Icons.done_all,
                   size: 16,
                   color: isRead
-                      ? const Color(0xFF4FC3F7)
-                      : Colors.grey.shade400,
+                      ? const Color(0xFF34B7F1)
+                      : Colors.grey.shade500,
                 ),
               ],
             ],

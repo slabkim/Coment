@@ -7,9 +7,16 @@ class AppConst {
   
   // 🔐 SECURE: API keys loaded from .env file (not committed to git)
   // Create a .env file in project root with: GIPHY_API_KEY=your_key_here
-  static String get giphyApiKey {
+  static String? get optionalGiphyApiKey {
     final key = dotenv.env['GIPHY_API_KEY'];
-    if (key == null || key.isEmpty) {
+    if (key == null) return null;
+    final trimmed = key.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  static String get giphyApiKey {
+    final key = optionalGiphyApiKey;
+    if (key == null) {
       throw Exception(
         '❌ GIPHY_API_KEY not found!\n'
         '📝 Create a .env file in project root with:\n'

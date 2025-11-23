@@ -153,6 +153,39 @@ class ForumService {
         });
   }
 
+  Future<List<Forum>> searchForums(String query, {int limit = 50}) async {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return getAllForums(limit: limit);
+    }
+
+    try {
+      final snapshot = await _db
+          .collection('forums')
+          .orderBy('memberCount', descending: true)
+          .orderBy('createdAt', descending: true)
+          .limit(200)
+          .get();
+
+      final matches = snapshot.docs
+          .map((doc) => Forum.fromMap(doc.id, doc.data()))
+          .where((forum) {
+            final name = forum.name.toLowerCase();
+            final desc = forum.description.toLowerCase();
+            final creator = forum.createdByName.toLowerCase();
+            return name.contains(normalized) ||
+                desc.contains(normalized) ||
+                creator.contains(normalized);
+          })
+          .take(limit)
+          .toList();
+      return matches;
+    } catch (e) {
+      AppLogger.firebaseError('searching forums', e);
+      return [];
+    }
+  }
+
   /// Delete a forum (only creator or developer can delete)
   /// Cascade deletes all related messages, members, and subscriptions
   Future<void> deleteForum(String forumId, String userId) async {

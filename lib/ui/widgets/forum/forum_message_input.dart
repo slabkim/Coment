@@ -21,6 +21,8 @@ class ForumMessageInput extends StatefulWidget {
   final VoidCallback onClearGif;
   final bool isSending;
   final GiphyService giphyService;
+  final bool isUserMuted;
+  final String? mutedMessage;
 
   const ForumMessageInput({
     super.key,
@@ -36,6 +38,8 @@ class ForumMessageInput extends StatefulWidget {
     required this.onClearGif,
     required this.isSending,
     required this.giphyService,
+    this.isUserMuted = false,
+    this.mutedMessage,
   });
 
   @override
@@ -44,6 +48,7 @@ class ForumMessageInput extends StatefulWidget {
 
 class _ForumMessageInputState extends State<ForumMessageInput> {
   Future<void> _pickGif() async {
+    if (widget.isUserMuted) return;
     final url = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: Theme.of(context).brightness == Brightness.light
@@ -242,46 +247,52 @@ class _ForumMessageInputState extends State<ForumMessageInput> {
   }
 
   Widget _buildInputRow() {
+    final isBlocked = widget.isUserMuted;
+    final theme = Theme.of(context);
     return Row(
       children: [
         IconButton(
-          onPressed: widget.onPickImage,
+          onPressed: isBlocked ? null : widget.onPickImage,
           icon: Icon(
             Icons.image,
-            color: Theme.of(context).colorScheme.onSurface,
+            color: theme.colorScheme.onSurface,
           ),
           tooltip: 'Add Image',
         ),
         IconButton(
-          onPressed: _pickGif,
+          onPressed: isBlocked ? null : _pickGif,
           icon: Icon(
             Icons.gif_box,
-            color: Theme.of(context).colorScheme.onSurface,
+            color: theme.colorScheme.onSurface,
           ),
           tooltip: 'Add GIF',
         ),
         Expanded(
           child: TextField(
             controller: widget.messageController,
+            enabled: !isBlocked,
+            readOnly: isBlocked,
             decoration: InputDecoration(
-              hintText: 'Type a message...',
+              hintText: isBlocked
+                  ? (widget.mutedMessage ?? 'You are muted and cannot post in forums.')
+                  : 'Type a message...',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(24),
                 borderSide: BorderSide.none,
               ),
               filled: true,
-              fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+              fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.5),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             ),
             maxLines: null,
             textInputAction: TextInputAction.send,
-            onSubmitted: (_) => widget.onSendMessage(),
+            onSubmitted: isBlocked ? null : (_) => widget.onSendMessage(),
           ),
         ),
         const SizedBox(width: 8),
         IconButton(
-          onPressed: widget.isSending ? null : widget.onSendMessage,
-          icon: widget.isSending
+          onPressed: (widget.isSending || isBlocked) ? null : widget.onSendMessage,
+          icon: widget.isSending && !isBlocked
               ? SizedBox(
                   width: 20,
                   height: 20,
@@ -294,7 +305,7 @@ class _ForumMessageInputState extends State<ForumMessageInput> {
                 )
               : Icon(
                   Icons.send,
-                  color: Theme.of(context).colorScheme.onSurface,
+                  color: theme.colorScheme.onSurface,
                 ),
         ),
       ],

@@ -16,9 +16,14 @@ class ProfileSettingsSheet extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: Builder(
+          builder: (context) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            return SingleChildScrollView(
+              padding: EdgeInsets.only(bottom: bottomInset + 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
             // Handle bar
             Container(
               margin: const EdgeInsets.only(top: 12, bottom: 8),
@@ -126,6 +131,9 @@ class ProfileSettingsSheet extends StatelessWidget {
             
             const SizedBox(height: 24),
           ],
+              ),
+            );
+          },
         ),
       ),
     );

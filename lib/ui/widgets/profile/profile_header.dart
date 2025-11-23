@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../data/models/user_profile.dart';
+import '../../../data/models/user_role.dart';
+import '../common/identity_badge.dart';
 import '../profile/profile_stats.dart';
 
 /// Enhanced Profile Header with Cover Photo
@@ -117,41 +119,7 @@ class ProfileHeader extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            if (profile?.isDeveloper ?? false) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.verified, size: 12, color: Colors.white),
-                    SizedBox(width: 3),
-                    Text(
-                      'DEV',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ..._buildIdentityBadges(),
           ],
         ),
         if (handle != null && handle.isNotEmpty)
@@ -199,6 +167,22 @@ class ProfileHeader extends StatelessWidget {
         ? parts.last[0]
         : '';
     return (first + second).toUpperCase();
+  }
+
+  List<Widget> _buildIdentityBadges() {
+    final widgets = <Widget>[];
+    void addBadge(IdentityBadgeType type) {
+      if (widgets.isNotEmpty) widgets.add(const SizedBox(width: 6));
+      widgets.add(IdentityBadge(type: type));
+    }
+
+    if (profile?.role == UserRole.admin) {
+      addBadge(IdentityBadgeType.admin);
+    }
+    if (profile?.isDeveloper ?? false) {
+      addBadge(IdentityBadgeType.developer);
+    }
+    return widgets;
   }
 }
 

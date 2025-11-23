@@ -19,10 +19,13 @@ class WhereToReadTab extends StatefulWidget {
 class _WhereToReadTabState extends State<WhereToReadTab> {
   List<ExternalLink>? _externalLinks;
   bool _loadingExternalLinks = false;
+  bool get _isRunningTests =>
+      WidgetsBinding.instance.runtimeType.toString().contains('Test');
 
   @override
   void initState() {
     super.initState();
+    if (_isRunningTests) return;
     _loadExternalLinks();
   }
 

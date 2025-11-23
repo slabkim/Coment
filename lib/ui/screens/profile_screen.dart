@@ -8,6 +8,7 @@ import '../widgets/profile/profile_header.dart';
 import '../widgets/profile/profile_login_required.dart';
 import '../widgets/profile/favorite_manga_showcase.dart';
 import '../widgets/profile/profile_helpers.dart';
+import 'admin_dashboard_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -54,6 +55,27 @@ class ProfileScreen extends StatelessWidget {
                         SliverToBoxAdapter(
                           child: ProfileHeader(profile: profile, uid: uid),
                         ),
+                        
+                        if (profile?.canModerate ?? false)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: Card(
+                                child: ListTile(
+                                  leading: const Icon(Icons.shield_outlined),
+                                  title: const Text('Open Admin Dashboard'),
+                                  subtitle: const Text('Manage users, rooms, and reports'),
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const AdminDashboardScreen(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
                         
                         // XP & Class Section
                         if (profile != null)

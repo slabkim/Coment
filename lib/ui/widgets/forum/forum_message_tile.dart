@@ -7,10 +7,12 @@ import '../../../core/logger.dart';
 import '../../../core/forum_username_lookup.dart';
 import '../../../data/models/forum_message.dart';
 import '../../../data/models/user_profile.dart';
+import '../../../data/models/user_role.dart';
 import '../../../data/services/forum_message_service.dart';
 import '../../../data/services/user_service.dart';
 import '../../widgets/class_badge.dart';
 import '../../screens/user_public_profile_screen.dart';
+import '../common/identity_badge.dart';
 
 /// Widget for displaying an individual forum message.
 /// Includes user info, reply indicators, reactions, and action buttons.
@@ -55,14 +57,34 @@ class _ForumMessageTileState extends State<ForumMessageTile> {
     }
   }
 
+  List<Widget> _buildIdentityBadges({
+    required bool isAdmin,
+    required bool isDeveloper,
+  }) {
+    final widgets = <Widget>[];
+    void addBadge(IdentityBadgeType type) {
+      if (widgets.isNotEmpty) widgets.add(const SizedBox(width: 4));
+      widgets.add(IdentityBadge(
+        type: type,
+        size: IdentityBadgeSize.compact,
+      ));
+    }
+
+    if (isAdmin) addBadge(IdentityBadgeType.admin);
+    if (isDeveloper) addBadge(IdentityBadgeType.developer);
+    return widgets;
+  }
+
   void _showReactionPicker() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (context) {
         const emojis = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏', '🎉'];
         
         return SafeArea(
-          child: Padding(
+          top: false,
+          child: SingleChildScrollView(child: Padding(
             padding: const EdgeInsets.all(16),
             child: Wrap(
               spacing: 16,
@@ -80,6 +102,7 @@ class _ForumMessageTileState extends State<ForumMessageTile> {
                 );
               }).toList(),
             ),
+          ),
           ),
         );
       },
@@ -180,6 +203,7 @@ class _ForumMessageTileState extends State<ForumMessageTile> {
       builder: (context, snapshot) {
         final profile = snapshot.data;
         final isDev = profile?.isDeveloper ?? false;
+        final isAdmin = profile?.role == UserRole.admin;
         final userClass = profile?.userClass;
         
         return Row(
@@ -197,27 +221,10 @@ class _ForumMessageTileState extends State<ForumMessageTile> {
               ),
             ),
             
-            // Dev badge
-            if (isDev) ...[
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                  ),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'DEV',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
+            ..._buildIdentityBadges(
+              isAdmin: isAdmin,
+              isDeveloper: isDev,
+            ),
             
             // Class badge
             if (userClass != null) ...[
@@ -593,9 +600,11 @@ class _ForumMessageTileState extends State<ForumMessageTile> {
   void _showOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (context) {
         return SafeArea(
-          child: Column(
+          top: false,
+          child: SingleChildScrollView(child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Reply option
@@ -636,6 +645,7 @@ class _ForumMessageTileState extends State<ForumMessageTile> {
                 },
               ),
             ],
+          ),
           ),
         );
       },

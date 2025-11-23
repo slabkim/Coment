@@ -10,6 +10,7 @@ import '../../core/logger.dart';
 import '../../core/forum_username_lookup.dart';
 import '../../data/models/forum.dart';
 import '../../data/models/forum_message.dart';
+import '../../data/models/user_profile.dart';
 import '../../data/services/forum_service.dart';
 import '../../data/services/forum_message_service.dart';
 import '../../data/services/forum_member_service.dart';
@@ -182,6 +183,15 @@ class _ForumChatScreenState extends State<ForumChatScreen> {
     
     try {
       final profile = await _userService.fetchProfile(user.uid);
+      if (profile != null && profile.isMuted) {
+        if (mounted) {
+          _showMuteSnackBar(profile);
+        }
+        if (mounted) {
+          setState(() => _isSending = false);
+        }
+        return;
+      }
       
       // Extract mentions from text
       final mentions = _extractMentions(text);
@@ -236,6 +246,24 @@ class _ForumChatScreenState extends State<ForumChatScreen> {
         );
       }
     }
+  }
+
+  void _showMuteSnackBar(UserProfile profile) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_buildMuteMessage(profile))),
+    );
+  }
+
+  String _buildMuteMessage(UserProfile profile) {
+    final reason = (profile.lastSanctionReason?.trim().isNotEmpty ?? false)
+        ? profile.lastSanctionReason!.trim()
+        : 'Akunmu sedang di-mute oleh admin.';
+    final until = profile.mutedUntil;
+    if (until == null) return reason;
+    final day = until.toLocal();
+    final formatted =
+        '${day.day.toString().padLeft(2, '0')}/${day.month.toString().padLeft(2, '0')}/${day.year} ${day.hour.toString().padLeft(2, '0')}:${day.minute.toString().padLeft(2, '0')}';
+    return '$reason (berlaku sampai $formatted)';
   }
 
   Future<void> _deleteForum() async {
@@ -524,20 +552,52 @@ class _ForumChatScreenState extends State<ForumChatScreen> {
             ),
           ),
           
-          // Message input (always show if logged in)
-              ForumMessageInput(
-                messageController: _messageController,
-                onSendMessage: _sendMessage,
-                onPickImage: _pickImage,
-                onPickGif: _pickGif,
-                replyingTo: _replyingTo,
-                onClearReply: () => setState(() => _replyingTo = null),
-                selectedImage: _selectedImage,
-                onClearImage: () => setState(() => _selectedImage = null),
-                selectedGifUrl: _selectedGifUrl,
-                onClearGif: () => setState(() => _selectedGifUrl = null),
-                isSending: _isSending,
-                giphyService: _giphy,
+          StreamBuilder<UserProfile?>(
+            stream: currentUserId.isNotEmpty ? _userService.watchProfile(currentUserId) : null,
+            builder: (context, snapshot) {
+              final profile = snapshot.data;
+              final isMuted = profile?.isMuted ?? false;
+              final muteMessage = isMuted && profile != null ? _buildMuteMessage(profile) : null;
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (muteMessage != null)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 8, left: 16, right: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        muteMessage,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ForumMessageInput(
+                    messageController: _messageController,
+                    onSendMessage: _sendMessage,
+                    onPickImage: _pickImage,
+                    onPickGif: _pickGif,
+                    replyingTo: _replyingTo,
+                    onClearReply: () => setState(() => _replyingTo = null),
+                    selectedImage: _selectedImage,
+                    onClearImage: () => setState(() => _selectedImage = null),
+                    selectedGifUrl: _selectedGifUrl,
+                    onClearGif: () => setState(() => _selectedGifUrl = null),
+                    isSending: _isSending,
+                    giphyService: _giphy,
+                    isUserMuted: isMuted,
+                    mutedMessage: muteMessage,
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),

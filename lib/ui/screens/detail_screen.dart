@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 
@@ -18,9 +19,13 @@ class DetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid;
-    final favService = FavoriteService();
-    final statusService = ReadingStatusService();
+    final firebaseReady = Firebase.apps.isNotEmpty;
+    final String? currentUid =
+        firebaseReady ? FirebaseAuth.instance.currentUser?.uid : null;
+    final FavoriteService? favService =
+        firebaseReady ? FavoriteService() : null;
+    final ReadingStatusService? statusService =
+        firebaseReady ? ReadingStatusService() : null;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -30,12 +35,12 @@ class DetailScreen extends StatelessWidget {
           headerSliverBuilder: (context, innerBoxIsScrolled) {
             return [
               StreamBuilder<bool>(
-                stream: currentUid != null 
+                stream: (currentUid != null && favService != null)
                     ? favService.isFavoriteStream(
                         userId: currentUid,
                         titleId: item.id,
                       )
-                    : Stream.value(false),
+                    : Stream<bool>.value(false),
                 builder: (context, snap) {
                   final isFav = snap.data ?? false;
                   return SliverAppBar(
@@ -68,11 +73,22 @@ class DetailScreen extends StatelessWidget {
                         item: item,
                         isFavorite: isFav,
                         onFavoriteToggle: () async {
+                          if (!firebaseReady ||
+                              currentUid == null ||
+                              favService == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Login is required to manage favorites.'),
+                              ),
+                            );
+                            return;
+                          }
                           final success = await AuthHelper.requireAuthWithDialog(
                             context, 
                             'add this manga to your favorites'
                           );
-                          if (success && currentUid != null) {
+                          if (success) {
                             HapticFeedback.lightImpact();
                             await favService.toggleFavorite(
                               userId: currentUid,

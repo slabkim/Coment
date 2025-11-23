@@ -2,8 +2,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/models/user_profile.dart';
+import '../../data/models/user_role.dart';
 import '../../data/services/user_service.dart';
 import '../widgets/class_badge.dart';
+import '../widgets/profile/admin_user_actions_section.dart';
 import '../widgets/profile/user_profile_header.dart';
 import '../widgets/profile/user_profile_action_buttons.dart';
 import '../widgets/profile/favorite_manga_showcase.dart';
@@ -54,6 +56,25 @@ class UserPublicProfileScreen extends StatelessWidget {
                 profile: profile,
                 userId: userId,
                 isSelf: isSelf,
+              ),
+
+              StreamBuilder<UserProfile?>(
+                stream: currentUid == null
+                    ? null
+                    : userService.watchProfile(currentUid),
+                builder: (context, adminSnapshot) {
+                  final viewerProfile = adminSnapshot.data;
+                  final canModerate = !isSelf &&
+                      currentUid != null &&
+                      viewerProfile?.role == UserRole.admin;
+                  if (!canModerate) return const SizedBox.shrink();
+                  return Column(
+                    children: [
+                      const SizedBox(height: 16),
+                      AdminUserActionsSection(target: profile),
+                    ],
+                  );
+                },
               ),
               
               const SizedBox(height: 16),

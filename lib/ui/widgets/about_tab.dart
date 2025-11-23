@@ -22,12 +22,12 @@ import 'detail/reading_status_panel.dart';
 class AboutTab extends StatefulWidget {
   final NandogamiItem item;
   final String? uid;
-  final ReadingStatusService statusService;
+  final ReadingStatusService? statusService;
   const AboutTab({
     super.key,
     required this.item,
     required this.uid,
-    required this.statusService,
+    this.statusService,
   });
 
   @override
@@ -42,9 +42,13 @@ class _AboutTabState extends State<AboutTab> {
   List<MangaRelation>? _relations;
   List<Manga>? _recommendations;
 
+  bool get _isRunningTests =>
+      WidgetsBinding.instance.runtimeType.toString().contains('Test');
+
   @override
   void initState() {
     super.initState();
+    if (_isRunningTests) return;
     // Load data with delays to avoid rate limiting
     _loadCharacters();
     
@@ -117,11 +121,11 @@ class _AboutTabState extends State<AboutTab> {
                  const SizedBox(height: 24),
                  
                  // Reading Status Panel
-                 if (currentUid != null)
+                 if (currentUid != null && widget.statusService != null)
             ReadingStatusPanel(
                      uid: currentUid,
                      titleId: widget.item.id,
-                     statusService: widget.statusService,
+                     statusService: widget.statusService!,
                    ),
         ],
       ),

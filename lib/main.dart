@@ -29,12 +29,27 @@ import 'ui/screens/splash_screen.dart';
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Native notification tap channel
-const MethodChannel _notificationChannel = MethodChannel('com.example.nandogami/notification');
+const MethodChannel _notificationChannel = MethodChannel(
+  'com.example.nandogami/notification',
+);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await dotenv.load(fileName: '.env');
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (error, stackTrace) {
+    final isMissingEnv = error.toString().contains('FileNotFoundError');
+    if (isMissingEnv) {
+      AppLogger.warning(
+        '`.env` file not bundled; falling back to process environment.',
+        error,
+        stackTrace,
+      );
+    } else {
+      rethrow;
+    }
+  }
 
   // Initialize Firebase
   await FirebaseInitializer.initialize();
@@ -110,7 +125,10 @@ Future<void> _setupNotificationServices() async {
       },
     );
   } catch (error, stackTrace) {
-    await AuthTokenManager.handleAuthTokenFailure(error, stackTrace: stackTrace);
+    await AuthTokenManager.handleAuthTokenFailure(
+      error,
+      stackTrace: stackTrace,
+    );
   }
 
   // Initialize local notifications
@@ -127,13 +145,14 @@ Future<void> _setupNotificationServices() async {
   _notificationChannel.setMethodCallHandler((call) async {
     if (call.method == 'onNotificationTap') {
       try {
-        final Map<dynamic, dynamic> data = call.arguments as Map<dynamic, dynamic>;
+        final Map<dynamic, dynamic> data =
+            call.arguments as Map<dynamic, dynamic>;
         final Map<String, dynamic> messageData = data.map(
           (key, value) => MapEntry(key.toString(), value),
         );
-        
+
         final message = RemoteMessage(data: messageData);
-        
+
         Future.delayed(const Duration(milliseconds: 500), () {
           notificationNavigator.handleNavigation(message, initial: false);
         });

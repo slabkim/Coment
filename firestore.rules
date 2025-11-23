@@ -2,14 +2,53 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isDeveloperAccount() {
+      return isSignedIn() && request.auth.token.email == 'anandasubing190305@gmail.com' && 'sulthonabdulhakim2@gmail.com';
+    }
+
+    function profileRole(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    }
+
+    function isAdminRequest() {
+      return isDeveloperAccount() ||
+        (isSignedIn() && (
+          request.auth.token.role == 'admin' ||
+          request.auth.token.admin == true ||
+          profileRole(request.auth.uid) == 'admin'
+        ));
+    }
+
+    function isModeratorRequest() {
+      return isAdminRequest() ||
+        (isSignedIn() && (
+          request.auth.token.role == 'moderator' ||
+          request.auth.token.moderator == true ||
+          profileRole(request.auth.uid) == 'moderator'
+        ));
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
     match /titles/{titleId} {
       allow read: if true;
       allow write: if false;
     }
 
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdminRequest();
+    }
+
+    match /users/{userId}/sanctions/{sanctionId} {
+      allow read: if isOwner(userId) || isModeratorRequest();
+      allow create, update, delete: if isAdminRequest();
     }
 
     match /titles/{titleId}/reviews/{reviewId} {
@@ -209,6 +248,48 @@ service cloud.firestore {
       allow update: if request.auth != null && subscriptionId.matches('^' + request.auth.uid + '_.*');
       // Allow delete by user themselves OR forum moderators (for cascade delete)
       allow delete: if request.auth != null;
+    }
+
+    // ROOMS (admin-managed chat rooms)
+    match /rooms/{roomId} {
+      allow read: if true;
+      allow create, update, delete: if isAdminRequest();
+    }
+
+    match /rooms/{roomId}/members/{memberId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isModeratorRequest();
+    }
+
+    match /room_messages/{messageId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.userId;
+      allow update, delete: if isModeratorRequest() || (isSignedIn() && request.auth.uid == resource.data.userId);
+    }
+
+    // REPORTS
+    match /reports/{reportId} {
+      allow read: if isModeratorRequest();
+      allow create: if isSignedIn();
+      allow update, delete: if isModeratorRequest();
+    }
+
+    // ANNOUNCEMENTS
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow create, update, delete: if isAdminRequest();
+    }
+
+    // AUDIT LOGS
+    match /audit_logs/{logId} {
+      allow read: if isAdminRequest();
+      allow write: if false;
+    }
+
+    // SYSTEM SETTINGS / TOGGLES
+    match /system_settings/{settingId} {
+      allow read: if isModeratorRequest();
+      allow create, update, delete: if isAdminRequest();
     }
   }
 }

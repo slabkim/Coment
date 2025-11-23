@@ -1,4 +1,5 @@
 import 'user_class.dart';
+import 'user_role.dart';
 
 class UserProfile {
   final String id;
@@ -16,6 +17,14 @@ class UserProfile {
   final String? profileThemeColor;
   final Map<String, dynamic>? stats;
   final bool isDeveloper;
+  final UserRole role;
+  final UserStatus status;
+  final DateTime? mutedUntil;
+  final DateTime? bannedUntil;
+  final bool shadowBanned;
+  final String? lastSanctionReason;
+  final int sanctionCount;
+  final Map<String, dynamic>? moderationFlags;
 
   const UserProfile({
     required this.id,
@@ -33,10 +42,32 @@ class UserProfile {
     this.profileThemeColor,
     this.stats,
     this.isDeveloper = false,
+    this.role = UserRole.user,
+    this.status = UserStatus.active,
+    this.mutedUntil,
+    this.bannedUntil,
+    this.shadowBanned = false,
+    this.lastSanctionReason,
+    this.sanctionCount = 0,
+    this.moderationFlags,
   });
   
   /// Get user's class based on XP
   UserClass get userClass => UserClass.fromXP(xp);
+
+  bool get isMuted {
+    if (status != UserStatus.muted) return false;
+    if (mutedUntil == null) return true;
+    return mutedUntil!.isAfter(DateTime.now());
+  }
+
+  bool get isBanned {
+    if (status != UserStatus.banned) return false;
+    if (bannedUntil == null) return true;
+    return bannedUntil!.isAfter(DateTime.now());
+  }
+
+  bool get canModerate => role == UserRole.moderator || role == UserRole.admin;
 
   factory UserProfile.fromMap(String id, Map<String, dynamic> data) {
     final joined = data['joinAt'] ?? data['joinedAt'];
@@ -49,6 +80,12 @@ class UserProfile {
     DateTime? lastSeen;
     if (lastSeenData is num) {
       lastSeen = DateTime.fromMillisecondsSinceEpoch(lastSeenData.toInt());
+    }
+    DateTime? parseDate(dynamic raw) {
+      if (raw is num) {
+        return DateTime.fromMillisecondsSinceEpoch(raw.toInt());
+      }
+      return null;
     }
     
     // Auto-detect developer based on email or handle
@@ -72,6 +109,14 @@ class UserProfile {
       profileThemeColor: data['profileThemeColor'] as String?,
       stats: data['stats'] as Map<String, dynamic>?,
       isDeveloper: isDev,
+      role: UserRoleParser.fromString(data['role'] as String?),
+      status: UserStatusParser.fromString(data['status'] as String?),
+      mutedUntil: parseDate(data['mutedUntil']),
+      bannedUntil: parseDate(data['bannedUntil']),
+      shadowBanned: data['shadowBanned'] as bool? ?? false,
+      lastSanctionReason: data['lastSanctionReason'] as String?,
+      sanctionCount: (data['sanctionCount'] as num?)?.toInt() ?? 0,
+      moderationFlags: data['moderationFlags'] as Map<String, dynamic>?,
     );
   }
   
@@ -108,6 +153,14 @@ class UserProfile {
       'customStatus': customStatus,
       'profileThemeColor': profileThemeColor,
       'stats': stats,
+      'role': role.asValue,
+      'status': status.asValue,
+      'shadowBanned': shadowBanned,
+      'sanctionCount': sanctionCount,
+      if (mutedUntil != null) 'mutedUntil': mutedUntil!.millisecondsSinceEpoch,
+      if (bannedUntil != null) 'bannedUntil': bannedUntil!.millisecondsSinceEpoch,
+      if (lastSanctionReason != null) 'lastSanctionReason': lastSanctionReason,
+      if (moderationFlags != null) 'moderationFlags': moderationFlags,
     };
   }
 }
