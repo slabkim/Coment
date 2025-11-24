@@ -35,29 +35,25 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize animations
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _loadingController = AnimationController(
       duration: const Duration(milliseconds: 3500), // 3.5 detik
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
+    );
 
     // Start animations
     _fadeController.forward();
-    
+
     // Start loading animation after first frame to avoid blocking tests
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -88,19 +84,23 @@ class _SplashScreenState extends State<SplashScreen>
         themeProvider = Provider.of<ThemeProvider>(context, listen: false);
       } catch (_) {}
       await themeProvider?.load();
-      
+
       // Get ItemProvider dari context
       if (!mounted) return;
       ItemProvider? itemProvider;
       try {
         itemProvider = Provider.of<ItemProvider>(context, listen: false);
       } catch (_) {}
-      
+
       // Start loading data di background
       await itemProvider?.init();
     } catch (e, stackTrace) {
       // Log preload errors but don't block app startup
-      AppLogger.warning('Failed to preload data during splash screen', e, stackTrace);
+      AppLogger.warning(
+        'Failed to preload data during splash screen',
+        e,
+        stackTrace,
+      );
     }
   }
 
@@ -130,9 +130,9 @@ class _SplashScreenState extends State<SplashScreen>
   void _navigateToRoot() {
     if (!mounted || _blockedByBan || _hasNavigated) return;
     _hasNavigated = true;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const _RootGate()),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const _RootGate()));
   }
 
   @override
@@ -154,9 +154,7 @@ class _SplashScreenState extends State<SplashScreen>
             builder: (context, child) {
               return Opacity(
                 opacity: _fadeAnimation.value,
-                child: const Center(
-                  child: _SplashContent(),
-                ),
+                child: const Center(child: _SplashContent()),
               );
             },
           ),
@@ -247,17 +245,15 @@ class _SplashContentState extends State<_SplashContent>
   void initState() {
     super.initState();
     _loadingController = AnimationController(
-      duration: const Duration(milliseconds: 3500), // Sama dengan main controller
+      duration: const Duration(
+        milliseconds: 3500,
+      ), // Sama dengan main controller
       vsync: this,
     );
 
-    _loadingAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _loadingController,
-      curve: Curves.easeInOut,
-    ));
+    _loadingAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _loadingController, curve: Curves.easeInOut),
+    );
 
     // Start loading animation after image appears
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -281,63 +277,30 @@ class _SplashContentState extends State<_SplashContent>
       themeProvider = Provider.of<ThemeProvider>(context);
     } catch (_) {}
     final isDarkMode =
-        themeProvider?.isDarkMode ?? Theme.of(context).brightness == Brightness.dark;
+        themeProvider?.isDarkMode ??
+        Theme.of(context).brightness == Brightness.dark;
 
     return Stack(
       children: [
         // Full screen background image based on theme
         Positioned.fill(
           child: Image.asset(
-            isDarkMode 
-              ? 'assets/images/splashscreendarkmode.png'
-              : 'assets/images/splashscreenlightmode.png',
+            isDarkMode
+                ? 'assets/images/splashscreendarkmode.png'
+                : 'assets/images/splashscreenlightmode.png',
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              // Fallback if image not found
-              return Container(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                child: Center(
-                  child: Text(
-                    'Coment',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        
-        // Overlay untuk readability (berbeda untuk dark/light mode)
-        Positioned.fill(
-          child: Container(
-            color: isDarkMode 
-              ? Colors.black.withValues(alpha: 0.2)
-              : Colors.white.withValues(alpha: 0.1),
           ),
         ),
 
-        Align(
-          alignment: Alignment.center,
-          child: Text(
-            AppConst.appName,
-            style: TextStyle(
-              color: isDarkMode ? Colors.white : Colors.black,
-              fontSize: 42,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-              shadows: [
-                Shadow(
-                  color: isDarkMode ? Colors.black54 : Colors.white70,
-                  blurRadius: 8,
-                ),
-              ],
-            ),
+        // Overlay untuk readability (berbeda untuk dark/light mode)
+        Positioned.fill(
+          child: Container(
+            color: isDarkMode
+                ? Colors.black.withValues(alpha: 0.2)
+                : Colors.white.withValues(alpha: 0.1),
           ),
         ),
+
         // Bottom loading section - di ujung bawah sekali
         Positioned(
           left: 0,
@@ -351,9 +314,9 @@ class _SplashContentState extends State<_SplashContent>
                 width: screenWidth * 0.4, // Lebih kecil
                 height: 3, // Lebih tipis
                 decoration: BoxDecoration(
-                  color: isDarkMode 
-                    ? Colors.white.withValues(alpha: 0.2)
-                    : Colors.black.withValues(alpha: 0.1),
+                  color: isDarkMode
+                      ? Colors.white.withValues(alpha: 0.2)
+                      : Colors.black.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(1.5),
                 ),
                 child: AnimatedBuilder(
@@ -366,9 +329,9 @@ class _SplashContentState extends State<_SplashContent>
                           width: double.infinity,
                           height: 3,
                           decoration: BoxDecoration(
-                            color: isDarkMode 
-                              ? Colors.white.withValues(alpha: 0.2)
-                              : Colors.black.withValues(alpha: 0.1),
+                            color: isDarkMode
+                                ? Colors.white.withValues(alpha: 0.2)
+                                : Colors.black.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(1.5),
                           ),
                         ),
@@ -378,24 +341,26 @@ class _SplashContentState extends State<_SplashContent>
                           height: 3,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: isDarkMode 
-                                ? [
-                                    AppColors.purpleAccent,
-                                    Color(0xFF9C27B0),
-                                    Color(0xFFE91E63),
-                                  ]
-                                : [
-                                    Color(0xFF3B82F6), // Blue 500
-                                    Color(0xFF60A5FA), // Blue 400
-                                    Color(0xFF93C5FD), // Blue 300
-                                  ],
+                              colors: isDarkMode
+                                  ? [
+                                      AppColors.purpleAccent,
+                                      Color(0xFF9C27B0),
+                                      Color(0xFFE91E63),
+                                    ]
+                                  : [
+                                      Color(0xFF3B82F6), // Blue 500
+                                      Color(0xFF60A5FA), // Blue 400
+                                      Color(0xFF93C5FD), // Blue 300
+                                    ],
                             ),
                             borderRadius: BorderRadius.circular(1.5),
                             boxShadow: [
                               BoxShadow(
-                                color: isDarkMode 
-                                  ? AppColors.purpleAccent.withValues(alpha: 0.8)
-                                  : Color(0xFF3B82F6).withValues(alpha: 0.6),
+                                color: isDarkMode
+                                    ? AppColors.purpleAccent.withValues(
+                                        alpha: 0.8,
+                                      )
+                                    : Color(0xFF3B82F6).withValues(alpha: 0.6),
                                 blurRadius: 6,
                                 spreadRadius: 1,
                               ),
@@ -407,9 +372,9 @@ class _SplashContentState extends State<_SplashContent>
                   },
                 ),
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               // Loading text with fade animation
               AnimatedBuilder(
                 animation: _loadingAnimation,
@@ -419,16 +384,12 @@ class _SplashContentState extends State<_SplashContent>
                     child: Text(
                       'Loading manga collection...',
                       style: TextStyle(
-                        color: isDarkMode 
-                          ? Colors.white70
-                          : Colors.black54,
+                        color: isDarkMode ? Colors.white70 : Colors.black54,
                         fontSize: 10,
                         letterSpacing: 0.5,
                         shadows: [
                           Shadow(
-                            color: isDarkMode 
-                              ? Colors.black
-                              : Colors.white,
+                            color: isDarkMode ? Colors.black : Colors.white,
                             blurRadius: 2,
                           ),
                         ],

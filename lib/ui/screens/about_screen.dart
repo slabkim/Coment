@@ -20,15 +20,15 @@ class AboutScreen extends StatelessWidget {
             // Header Section
             _buildHeaderSection(context),
             const SizedBox(height: 32),
-            
+
             // Features Section
             _buildFeaturesSection(context),
             const SizedBox(height: 32),
-            
+
             // Mission Section
             _buildMissionSection(context),
             const SizedBox(height: 32),
-            
+
             // Footer Section
             _buildFooterSection(context),
           ],
@@ -63,7 +63,9 @@ class AboutScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -113,17 +115,20 @@ class AboutScreen extends StatelessWidget {
       {
         'icon': Icons.recommend,
         'title': 'Personal Recommendations',
-        'description': 'Get manga recommendations that match your preferences and reading history',
+        'description':
+            'Get manga recommendations that match your preferences and reading history',
       },
       {
         'icon': Icons.library_books,
         'title': 'Reading List',
-        'description': 'Manage your reading list with status like Plan, Reading, Completed, and more',
+        'description':
+            'Manage your reading list with status like Plan, Reading, Completed, and more',
       },
       {
         'icon': Icons.chat_bubble_outline,
         'title': 'Community & Discussion',
-        'description': 'Share experiences and discuss with fellow manga enthusiasts',
+        'description':
+            'Share experiences and discuss with fellow manga enthusiasts',
       },
       {
         'icon': Icons.search,
@@ -144,7 +149,7 @@ class AboutScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        ...features.map((feature) => _buildFeatureCard(context, feature)).toList(),
+        ...features.map((feature) => _buildFeatureCard(context, feature)),
       ],
     );
   }
@@ -166,7 +171,9 @@ class AboutScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -296,7 +303,4 @@ class AboutScreen extends StatelessWidget {
       ),
     );
   }
-
 }
-
-

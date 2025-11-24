@@ -48,6 +48,7 @@ class _ChatScreenState extends State<ChatScreen> {
   File? _selectedImage;
   String? _selectedGifUrl;
   bool _isUploadingImage = false; // Only for image upload, not for text/GIF messages
+  int? _lastIncomingMarkedAt;
 
   @override
   void dispose() {
@@ -264,12 +265,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               }
                               
                               final msgs = s2.data ?? const [];
-                              // mark read when list updates and show snackbar for new messages
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                _history.markReadNow(cid, uid);
-
-                                // in-app popup when new peer message arrives
-                              });
+                              _markIncomingAsRead(cid, uid, msgs);
                               return ListView.builder(
                                 controller: _scrollC,
                                 reverse: true,
@@ -516,6 +512,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final peer = widget.peerUserId;
     final id = await _chat.ensureChat(uid, peer);
     _chatId = id;
+    _lastIncomingMarkedAt = null;
     return id;
   }
 
@@ -528,6 +525,20 @@ class _ChatScreenState extends State<ChatScreen> {
       _selfName =
           profile?.username ?? user.displayName ?? user.email?.split('@').first;
     });
+  }
+
+  void _markIncomingAsRead(String chatId, String uid, List<ChatMessage> msgs) {
+    // Only mark read when a newer incoming message exists to avoid write loops.
+    final latestIncomingTs = msgs
+        .where((m) => m.senderId != uid)
+        .map((m) => m.createdAt.millisecondsSinceEpoch)
+        .fold<int?>(null, (prev, ts) => prev == null ? ts : (ts > prev ? ts : prev));
+
+    if (latestIncomingTs != null &&
+        (_lastIncomingMarkedAt == null || latestIncomingTs > _lastIncomingMarkedAt!)) {
+      _lastIncomingMarkedAt = latestIncomingTs;
+      _history.markReadNow(chatId, uid);
+    }
   }
   
   void _navigateToProfile(String userId) {
