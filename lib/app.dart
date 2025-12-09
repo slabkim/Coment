@@ -3,9 +3,12 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'core/constants.dart';
+import 'core/logger.dart';
+import 'data/models/user_profile.dart';
 import 'data/models/nandogami_item.dart';
 import 'data/repositories/comic_repository.dart';
 import 'data/services/user_service.dart';
@@ -25,18 +28,24 @@ class NandogamiApp extends StatefulWidget {
 class _NandogamiAppState extends State<NandogamiApp> with WidgetsBindingObserver {
   final _userService = UserService();
   Timer? _lastSeenTimer;
+  StreamSubscription<User?>? _authSub;
+  StreamSubscription<UserProfile?>? _profileSub;
+  bool _banExitTriggered = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _startLastSeenUpdates();
+    _listenForBanStatus();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _lastSeenTimer?.cancel();
+    _authSub?.cancel();
+    _profileSub?.cancel();
     super.dispose();
   }
 
@@ -69,6 +78,44 @@ class _NandogamiAppState extends State<NandogamiApp> with WidgetsBindingObserver
     if (user != null) {
       _userService.updateLastSeen(user.uid);
     }
+  }
+
+  void _listenForBanStatus() {
+    _authSub?.cancel();
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+      _profileSub?.cancel();
+      _banExitTriggered = false;
+
+      if (user != null) {
+        _profileSub = _userService.watchProfile(user.uid).listen(
+          (profile) {
+            final isBanned = profile?.isBanned ?? false;
+            if (isBanned && !_banExitTriggered) {
+              _banExitTriggered = true;
+              _handleBanExit();
+            } else if (!isBanned) {
+              _banExitTriggered = false;
+            }
+          },
+          onError: (error, stackTrace) {
+            AppLogger.warning(
+              'Failed to watch user ban status',
+              error,
+              stackTrace,
+            );
+          },
+        );
+      }
+    });
+  }
+
+  Future<void> _handleBanExit() async {
+    if (!mounted) return;
+    AppLogger.warning('User banned detected, closing app without signing out');
+    // Slight delay to allow any pending UI to settle before exiting
+    await Future.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
+    SystemNavigator.pop();
   }
 
   @override

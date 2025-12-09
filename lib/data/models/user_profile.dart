@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'user_class.dart';
 import 'user_role.dart';
 
@@ -84,6 +86,9 @@ class UserProfile {
     DateTime? parseDate(dynamic raw) {
       if (raw is num) {
         return DateTime.fromMillisecondsSinceEpoch(raw.toInt());
+      }
+      if (raw is Timestamp) {
+        return raw.toDate();
       }
       return null;
     }

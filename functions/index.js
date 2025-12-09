@@ -612,7 +612,6 @@ exports.adminBanUser = onCall(callableOptions, async(request) => {
     });
 
     await updateCustomClaims(userId, { banned: true });
-    await admin.auth().revokeRefreshTokens(userId);
 
     await logAudit({
         actorId: auth.uid,
