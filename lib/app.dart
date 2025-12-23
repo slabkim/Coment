@@ -17,6 +17,7 @@ import 'state/theme_provider.dart';
 import 'ui/screens/detail_screen.dart';
 import 'ui/screens/main_screen.dart';
 import 'core/theme.dart';
+import 'state/monetization_provider.dart';
 
 class NandogamiApp extends StatefulWidget {
   const NandogamiApp({super.key});
@@ -127,6 +128,9 @@ class _NandogamiAppState extends State<NandogamiApp> with WidgetsBindingObserver
         ),
         ChangeNotifierProvider(
           create: (_) => ThemeProvider()..load(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MonetizationProvider(),
         ),
       ],
       child: Consumer<ThemeProvider>(

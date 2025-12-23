@@ -19,6 +19,7 @@ import 'core/firebase/auth_token_manager.dart';
 import 'core/firebase/fcm_service.dart';
 import 'core/notifications/notification_navigator.dart';
 import 'core/notifications/in_app_notification_handler.dart';
+import 'core/ads/ad_service.dart';
 import 'data/repositories/comic_repository.dart';
 import 'notifications/notification_service.dart';
 import 'state/item_provider.dart';
@@ -88,6 +89,9 @@ Future<void> main() async {
 
   // Setup notification services
   await _setupNotificationServices();
+
+  // Initialize Google Mobile Ads
+  await AdService.initialize();
 
   // Run app
   runApp(const NandogamiBootstrap());

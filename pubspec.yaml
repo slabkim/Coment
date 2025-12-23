@@ -33,6 +33,8 @@ dependencies:
   google_sign_in: ^6.2.1
   youtube_player_flutter: ^9.0.3
   giphy_get: ^3.6.0
+  google_mobile_ads: ^5.2.0
+  in_app_purchase: ^3.2.0
 
 dev_dependencies:
   flutter_test:

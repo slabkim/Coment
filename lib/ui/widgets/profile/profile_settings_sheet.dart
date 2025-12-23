@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../screens/edit_profile_screen.dart';
 import '../../screens/reading_list_screen.dart';
 import '../../screens/about_screen.dart';
+import '../../screens/remove_ads_screen.dart';
+import '../../../state/monetization_provider.dart';
 import 'profile_helpers.dart';
 
 class ProfileSettingsSheet extends StatelessWidget {
@@ -101,6 +104,25 @@ class ProfileSettingsSheet extends StatelessWidget {
                 );
               },
             ),
+            Consumer<MonetizationProvider>(
+              builder: (context, monetization, _) {
+                final unlocked = monetization.adsRemoved;
+                return _settingsOption(
+                  context,
+                  icon: unlocked ? Icons.verified_outlined : Icons.workspace_premium_outlined,
+                  label: unlocked ? 'Iklan dimatikan' : 'Hilangkan Iklan',
+                  trailing: unlocked
+                      ? const Icon(Icons.check, color: Colors.green)
+                      : const Icon(Icons.lock_open, color: Colors.white70),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const RemoveAdsScreen()),
+                    );
+                  },
+                );
+              },
+            ),
             
             const SizedBox(height: 8),
             
@@ -144,6 +166,7 @@ class ProfileSettingsSheet extends StatelessWidget {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    Widget? trailing,
   }) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
@@ -160,10 +183,11 @@ class ProfileSettingsSheet extends StatelessWidget {
           fontSize: 16,
         ),
       ),
-      trailing: Icon(
-        Icons.chevron_right,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
+      trailing: trailing ??
+          Icon(
+            Icons.chevron_right,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
       onTap: onTap,
     );
   }

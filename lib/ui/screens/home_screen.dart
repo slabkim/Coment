@@ -9,6 +9,7 @@ import '../widgets/categories_section.dart';
 import '../widgets/manga_section.dart';
 import '../widgets/home/profile_badge.dart';
 import '../widgets/home/home_helpers.dart';
+import '../widgets/ads/banner_ad_widget.dart';
 import 'detail_screen.dart';
 import 'chat_list_screen.dart';
 import 'search_screen.dart';
@@ -407,6 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onMangaTap: _onMangaTap,
               ),
 
+            const BannerAdWidget(),
             const SizedBox(height: 16),
           ],
         ),
